@@ -21,7 +21,7 @@ src/
   runner/           Audit runners (Playwright, Lighthouse, axe-core, semantic, bundle)
   audit/            Scoring, prioritization, summarization, diff
   server/           Local static server for --build mode
-  report/           Markdown and PDF renderers
+  report/           Markdown renderer only.
   mcp/              MCP server and tool definitions
   config/           Config loading, defaults, Zod schema
   types/            Canonical schema types — source of truth for all data shapes
@@ -97,7 +97,7 @@ CLI flags / MCP input
         |
    AuditReport           (canonical output shape)
         |
-   report/markdown.ts    (human output)
+   report/markdown.ts    (human output, free tier only)
    stdout / file         (CLI)
    MCP tool return       (agent output)
 ```
@@ -124,7 +124,7 @@ Key types: `Finding`, `Fix`, `CategorySummary`, `PerformanceMetrics`, `PageResul
 
 ## Monetization boundary
 
-The --push flag is the boundary between the free CLI and the hosted layer. Nothing in the current codebase implements --push. Do not build toward it without explicit instruction. PDF export is a Pro feature and is intentionally not wired into the default output pipeline.
+The --push flag is the boundary between the free CLI and the hosted layer. Nothing in the current codebase implements --push. Do not build toward it without explicit instruction.
 
 ## Common gotchas
 
