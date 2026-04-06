@@ -1,0 +1,55 @@
+{
+  "score_delta": 8,
+  "passed": true,
+  "regressions": [
+    {
+      "id": "semantic-missing-h1",
+      "category": "semantic",
+      "severity": "major",
+      "effort": "low",
+      "title": "Missing h1 element",
+      "description": "Page has no h1 element.",
+      "recommendation": "Add a single h1 element that describes the page content.",
+      "selector": null,
+      "wcag": null,
+      "impact": null,
+      "url": "https://example.com"
+    }
+  ],
+  "improvements": [
+    {
+      "id": "a11y-image-alt",
+      "category": "a11y",
+      "severity": "critical",
+      "effort": "low",
+      "title": "Images must have alternative text",
+      "description": "Images without alt text are invisible to screen reader users.",
+      "recommendation": "Add a descriptive alt attribute to each image, or alt=\"\" for decorative images.",
+      "selector": "img.hero-banner",
+      "wcag": "1.1.1",
+      "impact": "critical",
+      "url": "https://example.com"
+    }
+  ],
+  "unchanged": [
+    {
+      "id": "semantic-skipped-heading-level",
+      "category": "semantic",
+      "severity": "minor",
+      "effort": "low",
+      "title": "Skipped heading level",
+      "description": "Heading level skipped from h1 to h3.",
+      "recommendation": "Use heading levels in sequential order without skipping levels.",
+      "selector": "h3",
+      "wcag": null,
+      "impact": null,
+      "url": "https://example.com"
+    }
+  ],
+  "metrics_delta": {
+    "lcp": -200,
+    "fcp": -100,
+    "performance_score": 5
+  },
+  "summary": "Score changed by +8 points (77 -> 85). 1 new issue found. 1 issue resolved."
+}

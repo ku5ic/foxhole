@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "summary": "Audited 1 page with an overall score of 77 out of 100. Found 2 issues: 1 critical, 0 major, 1 minor. This build has 1 critical issue that requires immediate attention.",
+  "score": 77,
+  "pages": [
+    {
+      "url": "https://example.com",
+      "score": 77,
+      "categories": [
+        {
+          "category": "a11y",
+          "score": 85,
+          "findings_count": 1,
+          "critical_count": 1,
+          "major_count": 0,
+          "minor_count": 0
+        },
+        {
+          "category": "semantic",
+          "score": 98,
+          "findings_count": 1,
+          "critical_count": 0,
+          "major_count": 0,
+          "minor_count": 1
+        }
+      ],
+      "findings": [
+        {
+          "id": "a11y-image-alt",
+          "category": "a11y",
+          "severity": "critical",
+          "effort": "low",
+          "title": "Images must have alternative text",
+          "description": "Images without alt text are invisible to screen reader users.",
+          "recommendation": "Add a descriptive alt attribute to each image, or alt=\"\" for decorative images.",
+          "selector": "img.hero-banner",
+          "wcag": "1.1.1",
+          "impact": "critical",
+          "url": "https://example.com"
+        },
+        {
+          "id": "semantic-skipped-heading-level",
+          "category": "semantic",
+          "severity": "minor",
+          "effort": "low",
+          "title": "Skipped heading level",
+          "description": "Heading level skipped from h1 to h3.",
+          "recommendation": "Use heading levels in sequential order without skipping levels.",
+          "selector": "h3",
+          "wcag": null,
+          "impact": null,
+          "url": "https://example.com"
+        }
+      ],
+      "metrics": {
+        "lcp": 2400,
+        "fid": 50,
+        "cls": 0.08,
+        "fcp": 1200,
+        "ttfb": 320,
+        "tbt": 180,
+        "performance_score": 85,
+        "accessibility_score": 72,
+        "bundle_size": 425000
+      },
+      "audited_at": "2026-04-07T12:00:00.000Z"
+    }
+  ],
+  "prioritized_fixes": [
+    {
+      "rank": 1,
+      "finding_ids": ["a11y-image-alt"],
+      "title": "Fix 1 critical accessibility issue",
+      "description": "1 critical accessibility finding that should be addressed.",
+      "effort": "low",
+      "severity": "critical",
+      "category": "a11y"
+    },
+    {
+      "rank": 2,
+      "finding_ids": ["semantic-skipped-heading-level"],
+      "title": "Fix 1 minor semantic HTML issue",
+      "description": "1 minor semantic finding that should be addressed.",
+      "effort": "low",
+      "severity": "minor",
+      "category": "semantic"
+    }
+  ],
+  "meta": {
+    "foxhole_version": "0.1.0",
+    "node_version": "v20.11.0",
+    "platform": "darwin",
+    "input_mode": "url",
+    "checks_run": ["perf", "a11y", "semantic"],
+    "crawl_depth": 0,
+    "duration_ms": 12500,
+    "threshold": 80,
+    "passed": false
+  }
+}

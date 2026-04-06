@@ -1,0 +1,5 @@
+{
+  "checks": ["perf", "a11y", "semantic", "bundle"],
+  "output": "markdown",
+  "threshold": 80
+}
