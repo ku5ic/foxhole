@@ -38,18 +38,6 @@ bin/
 dist/               Compiled output, gitignored
 ```
 
-## Workflow
-
-Every task follows this command sequence without exception:
-
-1. `/cmd-preflight` - Verify context, identify relevant skills, flag risks
-2. `/cmd-plan` - Write a specific implementation plan before touching code
-3. `/cmd-implement` - Execute the plan
-4. `/cmd-test` - Write tests for everything implemented
-5. `/cmd-review` - Review against the full quality checklist
-
-Do not skip steps. Do not combine steps. If a plan has unresolved open questions, stop at cmd-plan and ask.
-
 ## Skills
 
 Load the relevant skill before working in each area. Skills contain the decisions that must be consistent across every session.
