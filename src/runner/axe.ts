@@ -94,7 +94,14 @@ function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Fi
 
 async function runAxe(page: Page, pageUrl: string): Promise<AxeRunnerResult> {
   const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-  const axeSourcePath = path.resolve(__dirname, "..", "..", "node_modules", "axe-core", "axe.min.js");
+  const axeSourcePath = path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "node_modules",
+    "axe-core",
+    "axe.min.js",
+  );
   const axeSource = fs.readFileSync(axeSourcePath, "utf8");
 
   try {

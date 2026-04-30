@@ -55,6 +55,7 @@ Known gaps carried into Phase 0:
 - Implement `runner/semantic.ts` with all six DOM checks
 - Implement `runner/bundle.ts` with network interception and size thresholds
 - Validate runner output shape against the canonical `Finding` type
+- Enforce the `PageResult.categories` length-4 invariant in `audit/score.ts`: non-requested checks present as `status: "skipped"` entries per docs/spec/schemas.md section 1.7 (carried over from Phase 0)
 
 ### Success criteria
 
@@ -64,6 +65,7 @@ Known gaps carried into Phase 0:
 - Finding IDs are stable 16-hex-char hashes computed per docs/spec/schemas.md section 2
 - Severity mapping matches the finding-normalization skill exactly
 - When a runner throws, the resulting `CategorySummary` for that category has `status: "errored"` with the error message captured per docs/spec/architecture.md section 6.3 and docs/spec/schemas.md section 1.5
+- On every `PageResult` (ok or errored), `categories` has exactly 4 entries: ok categories have `status: "ok"`, errored categories have `status: "errored"`, non-requested categories have `status: "skipped"`
 
 ### Relevant decisions
 

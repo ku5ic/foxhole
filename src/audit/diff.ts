@@ -53,17 +53,19 @@ function averageMetrics(report: AuditReport): PerformanceMetrics {
     };
   }
   // Use the first page metrics for simplicity in diff
-  return report.pages[0]?.metrics ?? {
-    lcp: null,
-    fid: null,
-    cls: null,
-    fcp: null,
-    ttfb: null,
-    tbt: null,
-    performance_score: null,
-    accessibility_score: null,
-    bundle_size: null,
-  };
+  return (
+    report.pages[0]?.metrics ?? {
+      lcp: null,
+      fid: null,
+      cls: null,
+      fcp: null,
+      ttfb: null,
+      tbt: null,
+      performance_score: null,
+      accessibility_score: null,
+      bundle_size: null,
+    }
+  );
 }
 
 function diffReports(before: AuditReport, after: AuditReport): RunDiff {
@@ -89,21 +91,22 @@ function diffReports(before: AuditReport, after: AuditReport): RunDiff {
     }
   }
 
-  const metricsDelta = computeMetricsDelta(
-    averageMetrics(before),
-    averageMetrics(after),
-  );
+  const metricsDelta = computeMetricsDelta(averageMetrics(before), averageMetrics(after));
 
   const parts: string[] = [
     `Score changed by ${scoreDelta >= 0 ? "+" : ""}${String(scoreDelta)} points (${String(before.score)} -> ${String(after.score)}).`,
   ];
 
   if (regressions.length > 0) {
-    parts.push(`${String(regressions.length)} new ${regressions.length === 1 ? "issue" : "issues"} found.`);
+    parts.push(
+      `${String(regressions.length)} new ${regressions.length === 1 ? "issue" : "issues"} found.`,
+    );
   }
 
   if (improvements.length > 0) {
-    parts.push(`${String(improvements.length)} ${improvements.length === 1 ? "issue" : "issues"} resolved.`);
+    parts.push(
+      `${String(improvements.length)} ${improvements.length === 1 ? "issue" : "issues"} resolved.`,
+    );
   }
 
   if (regressions.length === 0 && improvements.length === 0) {

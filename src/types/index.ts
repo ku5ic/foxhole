@@ -1,6 +1,8 @@
 export type CheckCategory = "perf" | "a11y" | "semantic" | "bundle";
 export type Severity = "critical" | "major" | "minor";
 export type Effort = "low" | "medium" | "high";
+export type CategoryStatus = "ok" | "errored" | "skipped";
+export type PageStatus = "ok" | "errored";
 
 export interface Finding {
   id: string;
@@ -28,6 +30,8 @@ export interface Fix {
 
 export interface CategorySummary {
   category: CheckCategory;
+  status: CategoryStatus;
+  error: { message: string } | null;
   score: number;
   findings_count: number;
   critical_count: number;
@@ -49,6 +53,8 @@ export interface PerformanceMetrics {
 
 export interface PageResult {
   url: string;
+  status: PageStatus;
+  error: { message: string } | null;
   score: number;
   categories: CategorySummary[];
   findings: Finding[];

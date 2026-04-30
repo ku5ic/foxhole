@@ -92,9 +92,7 @@ async function runSemanticChecks(page: Page, pageUrl: string): Promise<SemanticR
     const rawResults: unknown = await page.evaluate(SEMANTIC_CHECKS_SCRIPT);
     const results = rawResults as SemanticCheckResult[];
 
-    const findings = results.flatMap((result) =>
-      mapSemanticResultToFindings(result, pageUrl),
-    );
+    const findings = results.flatMap((result) => mapSemanticResultToFindings(result, pageUrl));
 
     return { findings };
   } catch (cause) {
@@ -118,50 +116,63 @@ function severityForCheck(check: string): "critical" | "major" | "minor" {
 
 function titleForCheck(check: string): string {
   switch (check) {
-    case "missing-h1": { return "Missing h1 element";
+    case "missing-h1": {
+      return "Missing h1 element";
     }
-    case "multiple-h1": { return "Multiple h1 elements";
+    case "multiple-h1": {
+      return "Multiple h1 elements";
     }
-    case "skipped-heading-level": { return "Skipped heading level";
+    case "skipped-heading-level": {
+      return "Skipped heading level";
     }
-    case "interactive-no-text": { return "Interactive element without accessible text";
+    case "interactive-no-text": {
+      return "Interactive element without accessible text";
     }
-    case "input-no-label": { return "Form input without associated label";
+    case "input-no-label": {
+      return "Form input without associated label";
     }
-    case "img-no-alt": { return "Image missing alt attribute";
+    case "img-no-alt": {
+      return "Image missing alt attribute";
     }
-    case "fake-button-no-keyboard": { return "Custom button missing keyboard access";
+    case "fake-button-no-keyboard": {
+      return "Custom button missing keyboard access";
     }
-    default: { return check;
+    default: {
+      return check;
     }
   }
 }
 
 function recommendationForCheck(check: string): string {
   switch (check) {
-    case "missing-h1": { return "Add a single h1 element that describes the page content.";
+    case "missing-h1": {
+      return "Add a single h1 element that describes the page content.";
     }
-    case "multiple-h1": { return "Use a single h1 per page. Demote extra h1 elements to h2 or lower.";
+    case "multiple-h1": {
+      return "Use a single h1 per page. Demote extra h1 elements to h2 or lower.";
     }
-    case "skipped-heading-level": { return "Use heading levels in sequential order without skipping levels.";
+    case "skipped-heading-level": {
+      return "Use heading levels in sequential order without skipping levels.";
     }
-    case "interactive-no-text": { return "Add visible text, an aria-label, or a title attribute to the element.";
+    case "interactive-no-text": {
+      return "Add visible text, an aria-label, or a title attribute to the element.";
     }
-    case "input-no-label": { return "Associate a label element with each form input using the for attribute.";
+    case "input-no-label": {
+      return "Associate a label element with each form input using the for attribute.";
     }
-    case "img-no-alt": { return "Add a descriptive alt attribute to the image, or alt=\"\" if decorative.";
+    case "img-no-alt": {
+      return 'Add a descriptive alt attribute to the image, or alt="" if decorative.';
     }
-    case "fake-button-no-keyboard": { return "Add tabindex=\"0\" and keyboard event handlers to custom button elements.";
+    case "fake-button-no-keyboard": {
+      return 'Add tabindex="0" and keyboard event handlers to custom button elements.';
     }
-    default: { return "Review and fix the semantic issue.";
+    default: {
+      return "Review and fix the semantic issue.";
     }
   }
 }
 
-function mapSemanticResultToFindings(
-  result: SemanticCheckResult,
-  pageUrl: string,
-): Finding[] {
+function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: string): Finding[] {
   return result.issues.map((issue) => ({
     id: `semantic-${result.check}`,
     category: "semantic" as const,

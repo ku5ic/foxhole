@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 
 import { diffReports } from "../../src/audit/diff.js";
-import type { AuditReport, Finding, PerformanceMetrics } from "../../src/types/index.js";
+import type {
+  AuditReport,
+  Finding,
+  PageResult,
+  PerformanceMetrics,
+} from "../../src/types/index.js";
 
 function makeFinding(overrides: Partial<Finding> = {}): Finding {
   return {
@@ -34,21 +39,26 @@ function emptyMetrics(): PerformanceMetrics {
   };
 }
 
+function basePage(overrides: Partial<PageResult> = {}): PageResult {
+  return {
+    url: "https://example.com",
+    status: "ok",
+    error: null,
+    score: 80,
+    categories: [],
+    findings: [],
+    metrics: emptyMetrics(),
+    audited_at: "2026-04-07T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 function makeReport(overrides: Partial<AuditReport> = {}): AuditReport {
   return {
     version: 1,
     summary: "Test report.",
     score: 80,
-    pages: [
-      {
-        url: "https://example.com",
-        score: 80,
-        categories: [],
-        findings: [],
-        metrics: emptyMetrics(),
-        audited_at: "2026-04-07T00:00:00.000Z",
-      },
-    ],
+    pages: [basePage()],
     prioritized_fixes: [],
     meta: {
       foxhole_version: "0.1.0",
@@ -76,12 +86,7 @@ describe("diffReports", () => {
   it("identifies regressions (findings in after not in before)", () => {
     const before = makeReport();
     const after = makeReport({
-      pages: [
-        {
-          ...makeReport().pages[0]!,
-          findings: [makeFinding({ id: "new-issue" })],
-        },
-      ],
+      pages: [basePage({ findings: [makeFinding({ id: "new-issue" })] })],
     });
 
     const diff = diffReports(before, after);
@@ -91,12 +96,7 @@ describe("diffReports", () => {
 
   it("identifies improvements (findings in before not in after)", () => {
     const before = makeReport({
-      pages: [
-        {
-          ...makeReport().pages[0]!,
-          findings: [makeFinding({ id: "fixed-issue" })],
-        },
-      ],
+      pages: [basePage({ findings: [makeFinding({ id: "fixed-issue" })] })],
     });
     const after = makeReport();
 
@@ -107,12 +107,8 @@ describe("diffReports", () => {
 
   it("identifies unchanged findings", () => {
     const shared = makeFinding({ id: "stable-issue" });
-    const before = makeReport({
-      pages: [{ ...makeReport().pages[0]!, findings: [shared] }],
-    });
-    const after = makeReport({
-      pages: [{ ...makeReport().pages[0]!, findings: [shared] }],
-    });
+    const before = makeReport({ pages: [basePage({ findings: [shared] })] });
+    const after = makeReport({ pages: [basePage({ findings: [shared] })] });
 
     const diff = diffReports(before, after);
     expect(diff.unchanged).toHaveLength(1);
@@ -121,20 +117,10 @@ describe("diffReports", () => {
 
   it("computes metrics_delta for fields where both values are non-null", () => {
     const before = makeReport({
-      pages: [
-        {
-          ...makeReport().pages[0]!,
-          metrics: { ...emptyMetrics(), lcp: 3000, fcp: 1500 },
-        },
-      ],
+      pages: [basePage({ metrics: { ...emptyMetrics(), lcp: 3000, fcp: 1500 } })],
     });
     const after = makeReport({
-      pages: [
-        {
-          ...makeReport().pages[0]!,
-          metrics: { ...emptyMetrics(), lcp: 2500, fcp: 1200 },
-        },
-      ],
+      pages: [basePage({ metrics: { ...emptyMetrics(), lcp: 2500, fcp: 1200 } })],
     });
 
     const diff = diffReports(before, after);
@@ -144,20 +130,10 @@ describe("diffReports", () => {
 
   it("skips metrics_delta for fields where either value is null", () => {
     const before = makeReport({
-      pages: [
-        {
-          ...makeReport().pages[0]!,
-          metrics: { ...emptyMetrics(), lcp: 3000, cls: null },
-        },
-      ],
+      pages: [basePage({ metrics: { ...emptyMetrics(), lcp: 3000, cls: null } })],
     });
     const after = makeReport({
-      pages: [
-        {
-          ...makeReport().pages[0]!,
-          metrics: { ...emptyMetrics(), lcp: 2500, cls: 0.1 },
-        },
-      ],
+      pages: [basePage({ metrics: { ...emptyMetrics(), lcp: 2500, cls: 0.1 } })],
     });
 
     const diff = diffReports(before, after);

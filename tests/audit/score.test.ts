@@ -37,6 +37,8 @@ function emptyMetrics(): PerformanceMetrics {
 function makePageResult(findings: Finding[]): PageResult {
   return {
     url: "https://example.com",
+    status: "ok",
+    error: null,
     score: 0,
     categories: [],
     findings,

@@ -7,16 +7,56 @@ import { loadConfig } from "../../config/load.js";
 import { DEFAULT_CHECKS } from "../../config/defaults.js";
 import { buildAuditReport } from "../../audit/index.js";
 import { renderMarkdownReport } from "../../report/markdown.js";
+import { serveStaticBuild } from "../../server/static.js";
+import type { StaticServer } from "../../server/static.js";
 import type { RunOptions } from "../options.js";
-import type { CheckCategory } from "../../types/index.js";
+import type { AuditReport, CheckCategory } from "../../types/index.js";
+
+type InputMode = "url" | "urls" | "build";
 
 function parseChecks(input: string): CheckCategory[] {
   return input.split(",").map((s) => s.trim()) as CheckCategory[];
 }
 
-function resolveUrls(options: RunOptions): string[] {
-  if (options.url) return [options.url];
-  if (options.urls) return options.urls.split(",").map((s) => s.trim());
+function validateInputMode(options: RunOptions): InputMode {
+  const hasUrl = options.url !== undefined;
+  const hasUrls = options.urls !== undefined;
+  const hasBuild = options.build !== undefined;
+
+  if (!hasUrl && !hasUrls && !hasBuild) {
+    process.stderr.write("Error: one of --url, --urls, or --build is required\n");
+    process.exit(2);
+  }
+
+  if (hasUrl && hasUrls) {
+    process.stderr.write("Error: --url and --urls are mutually exclusive\n");
+    process.exit(2);
+  }
+
+  if (hasUrl && hasBuild) {
+    process.stderr.write("Error: --url and --build are mutually exclusive\n");
+    process.exit(2);
+  }
+
+  if (hasBuild && !hasUrls) {
+    process.stderr.write("Error: --build requires --urls\n");
+    process.exit(2);
+  }
+
+  if (hasBuild) return "build";
+  if (hasUrl) return "url";
+  return "urls";
+}
+
+function resolveUrls(options: RunOptions, serverUrl: string | null): string[] {
+  if (options.url !== undefined) return [options.url];
+  if (options.urls !== undefined) {
+    const parts = options.urls.split(",").map((s) => s.trim());
+    if (serverUrl !== null) {
+      return parts.map((u) => (u.startsWith("/") ? `${serverUrl}${u}` : u));
+    }
+    return parts;
+  }
   return [];
 }
 
@@ -48,29 +88,37 @@ function registerRunCommand(program: Command): void {
 }
 
 async function handleRun(options: RunOptions): Promise<void> {
-  const hasInput = options.url ?? options.urls ?? options.build;
-  if (!hasInput) {
-    process.stderr.write("Error: one of --url, --urls, or --build is required\n");
-    process.exit(2);
-  }
+  const mode = validateInputMode(options);
 
   const config = options.config ? await loadConfig(options.config) : undefined;
 
   const checks: CheckCategory[] = options.checks
     ? parseChecks(options.checks)
-    : config?.checks ?? DEFAULT_CHECKS;
+    : (config?.checks ?? DEFAULT_CHECKS);
 
-  const urls = resolveUrls(options);
   const threshold = options.threshold ?? config?.threshold;
   const outputFormat = options.output ?? config?.output ?? "markdown";
   const quiet = options.quiet ?? false;
 
-  const report = await buildAuditReport({
-    urls,
-    checks,
-    quiet,
-    threshold,
-  });
+  let server: StaticServer | null = null;
+  let report: AuditReport;
+  try {
+    let serverUrl: string | null = null;
+    if (mode === "build" && options.build !== undefined) {
+      server = await serveStaticBuild(options.build);
+      serverUrl = server.url;
+    }
+    const urls = resolveUrls(options, serverUrl);
+
+    report = await buildAuditReport({
+      urls,
+      checks,
+      quiet,
+      threshold,
+    });
+  } finally {
+    if (server) await server.close();
+  }
 
   const content =
     outputFormat === "json" ? JSON.stringify(report, null, 2) : renderMarkdownReport(report);
@@ -86,4 +134,4 @@ async function handleRun(options: RunOptions): Promise<void> {
   }
 }
 
-export { registerRunCommand };
+export { registerRunCommand, handleRun };
