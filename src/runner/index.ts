@@ -84,7 +84,7 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
             await page.goto(url, { waitUntil: "domcontentloaded" });
             await waitForPageReady(page);
           } catch (cause) {
-            throw new RunnerError(`Failed to navigate to ${url}`, cause);
+            throw new RunnerError("Failed to navigate to page", cause);
           }
         }
 

@@ -10,7 +10,7 @@ import { renderMarkdownReport } from "../../report/markdown.js";
 import { serveStaticBuild } from "../../server/static.js";
 import type { StaticServer } from "../../server/static.js";
 import type { RunOptions } from "../options.js";
-import type { CheckCategory } from "../../types/index.js";
+import type { AuditReport, CheckCategory } from "../../types/index.js";
 
 type InputMode = "url" | "urls" | "build";
 
@@ -101,7 +101,7 @@ async function handleRun(options: RunOptions): Promise<void> {
   const quiet = options.quiet ?? false;
 
   let server: StaticServer | null = null;
-  let report;
+  let report: AuditReport;
   try {
     let serverUrl: string | null = null;
     if (mode === "build" && options.build !== undefined) {
