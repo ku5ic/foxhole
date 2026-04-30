@@ -85,6 +85,8 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
 
       results.push({
         url,
+        status: "ok",
+        error: null,
         score: 0,
         categories: [],
         findings,

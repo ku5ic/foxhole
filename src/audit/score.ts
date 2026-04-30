@@ -1,9 +1,4 @@
-import type {
-  CheckCategory,
-  CategorySummary,
-  Finding,
-  PageResult,
-} from "../types/index.js";
+import type { CheckCategory, CategorySummary, Finding, PageResult } from "../types/index.js";
 
 const CRITICAL_PENALTY = 15;
 const MAJOR_PENALTY = 8;
@@ -32,13 +27,12 @@ function scoreFindings(findings: Finding[]): number {
   return Math.max(0, score);
 }
 
-function buildCategorySummary(
-  category: CheckCategory,
-  findings: Finding[],
-): CategorySummary {
+function buildCategorySummary(category: CheckCategory, findings: Finding[]): CategorySummary {
   const categoryFindings = findings.filter((f) => f.category === category);
   return {
     category,
+    status: "ok",
+    error: null,
     score: scoreFindings(categoryFindings),
     findings_count: categoryFindings.length,
     critical_count: categoryFindings.filter((f) => f.severity === "critical").length,
@@ -49,12 +43,8 @@ function buildCategorySummary(
 
 function scorePage(pageResult: PageResult): PageResult {
   const score = scoreFindings(pageResult.findings);
-  const presentCategories = [
-    ...new Set(pageResult.findings.map((f) => f.category)),
-  ];
-  const categories = presentCategories.map((cat) =>
-    buildCategorySummary(cat, pageResult.findings),
-  );
+  const presentCategories = [...new Set(pageResult.findings.map((f) => f.category))];
+  const categories = presentCategories.map((cat) => buildCategorySummary(cat, pageResult.findings));
 
   return {
     ...pageResult,
