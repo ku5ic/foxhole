@@ -370,6 +370,7 @@ Documented in section 10 of the v1 spec. The implementation guarantees:
 - A resolved path that does not exist on disk (in `--build` mode) is discarded
 - `--source-maps off` skips the entire pipeline
 - `--source-maps on` logs a warning per failed resolution; `auto` logs at debug level only
+- Cross-origin source-map URLs are not fetched in v1, per v1 spec 10.3
 
 ## 8. Internal static server
 

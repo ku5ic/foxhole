@@ -16,22 +16,22 @@ Close the four known gaps from the scaffold before any feature work begins. This
 
 **Modified:**
 
-- `src/cli/commands/run.ts` -- wire `--build` flag to `serveStaticBuild`, tear down server after run
-- `src/runner/index.ts` -- wrap per-page run in try/catch, catch `RunnerError`, isolate failures, continue to next page
-- `src/runner/axe.ts` -- replace raw throws with `RunnerError`
-- `src/runner/lighthouse.ts` -- replace raw throws with `RunnerError`
-- `src/runner/semantic.ts` -- replace raw throws with `RunnerError`
-- `src/runner/bundle.ts` -- replace raw throws with `RunnerError`
-- `src/runner/browser.ts` -- replace raw throws with `RunnerError`
-- `README.md` -- add known limitations section
+- `src/cli/commands/run.ts`: wire `--build` flag to `serveStaticBuild`, tear down server after run
+- `src/runner/index.ts`: wrap per-page run in try/catch, catch `RunnerError`, isolate failures, continue to next page
+- `src/runner/axe.ts`: replace raw throws with `RunnerError`
+- `src/runner/lighthouse.ts`: replace raw throws with `RunnerError`
+- `src/runner/semantic.ts`: replace raw throws with `RunnerError`
+- `src/runner/bundle.ts`: replace raw throws with `RunnerError`
+- `src/runner/browser.ts`: replace raw throws with `RunnerError`
+- `README.md`: add known limitations section
 
 **Not touched:**
 
-- `src/types/index.ts` -- no schema changes
-- `src/audit/` -- no audit logic changes
-- `src/mcp/` -- no MCP changes
-- `src/config/` -- no config changes
-- All test files -- existing tests must continue to pass; new tests added for error paths
+- `src/types/index.ts`: no schema changes
+- `src/audit/`: no audit logic changes
+- `src/mcp/`: no MCP changes
+- `src/config/`: no config changes
+- All test files: existing tests must continue to pass; new tests added for error paths
 
 ---
 
@@ -53,11 +53,11 @@ Messages follow the pattern: `"Failed to {action} for {context}"`, for example `
 
 ### Step 3: Per-page failure isolation in runner/index.ts
 
-In `runAudit`, the loop over URLs currently has no error handling. Wrap the body of the per-URL loop in try/catch. On `RunnerError`, log the failure to stderr with the `[foxhole]` prefix and the URL that failed, then continue to the next URL. Do not re-throw. Do not abort the run.
+In `runAudit`, the loop over URLs currently has no error handling. Wrap the body of the per-URL loop in try/catch. On `RunnerError`, capture the error message and construct a `PageResult` with `status: "errored"`, the message in `error`, an empty `findings` array, all-null `metrics`, and `categories` populated with one `status: "errored"` entry per requested check. Push the errored `PageResult` and continue to the next URL. Do not re-throw. Do not abort the run.
 
-The returned `PageResult[]` will contain results only for pages that succeeded. Pages that failed are omitted, not included with empty findings. The caller (audit orchestrator) must handle a result array shorter than the input URL list.
+The returned `PageResult[]` carries one entry per input URL. Failed pages appear with `status: "errored"`; successful pages appear with `status: "ok"`. The caller can rely on `result.length === input_urls.length`. This matches the partial-failure contract in docs/spec/architecture.md section 6.3 and docs/spec/schemas.md section 1.7.
 
-Add a log line for each skipped page: `[foxhole] skipped {url}: {error.message}`.
+Log each failed page to stderr: `[foxhole] failed {url}: {error.message}`.
 
 ### Step 4: Wire --build into run command
 
@@ -69,21 +69,21 @@ In `src/cli/commands/run.ts`, in the `handleRun` function:
 4. After the audit completes (success or failure), call `close()` to shut down the server.
 5. Use a try/finally block to guarantee `close()` is called even if the audit throws.
 
-Validate that `--build` and `--url` are not both set. If both are present, print an error and exit with code 2.
+Validate input mode mutual exclusion per docs/spec/v1.md section 5.2: `--url`, `--urls` (without `--build`), and `--build` are pairwise exclusive; `--build --urls` is the SPA build mode and both are required together. On violation, print an error and exit with code 2.
 
 ### Step 5: Add known limitations to README
 
-Add a "Known limitations" section to `README.md` after the requirements section. Include:
+Add a "Known limitations" section to `README.md` after the requirements section. Document only constraints that are genuinely v1 limitations per the v1 spec:
 
-- Lighthouse runs a separate Chrome instance alongside the Playwright browser. On resource-constrained machines, this may affect performance metrics. Unification is planned for a future release.
-- The `--urls` flag requires explicit route listing. Automatic crawling is not available in v1.
-- axe-core effort estimates default to "medium" for all findings. Per-rule effort estimation is planned for a future release.
+- Cross-origin source maps are not fetched (per v1 spec 10.3).
+- `--build` mode does not run a server-side renderer or proxy API requests.
+- Lighthouse performance scores have inherent variance; use `--perf-runs` to take a median.
 
 ---
 
 ## 4. Data flow
 
-No data flow changes. This phase only changes how errors are constructed and propagated, and adds the static server lifecycle to the run command.
+Two changes: per-page runner failures produce errored `PageResult` entries rather than skipping the page, and the run command adds the static server lifecycle for `--build` mode.
 
 ```
 run command (--build set)
@@ -94,9 +94,9 @@ run command (--build set)
   prepend server url to each relative path in --urls
   |
   try {
-    runAudit(options)  -- existing flow, unchanged
+    runAudit(options)  // existing flow, unchanged
   } finally {
-    close()            -- guaranteed cleanup
+    close()            // guaranteed cleanup
   }
 ```
 
@@ -106,26 +106,28 @@ runAudit (per-URL loop)
   for each url:
     try {
       launch browser, run checks, collect findings
+      push PageResult { status: "ok", findings, metrics, categories }
     } catch (error: RunnerError) {
-      log skip message to stderr
+      log failure to stderr
+      push PageResult { status: "errored", error: { message }, findings: [], metrics: nulled, categories: all errored }
       continue
     }
   |
-  return PageResult[] (only successful pages)
+  return PageResult[] (one entry per input URL)
 ```
 
 ---
 
 ## 5. Error cases
 
-| Failure                             | Error class                         | Behavior                                               |
-| ----------------------------------- | ----------------------------------- | ------------------------------------------------------ |
-| Browser fails to launch             | RunnerError                         | Caught at per-page loop, page skipped, audit continues |
-| axe-core throws during audit        | RunnerError                         | Caught at per-page loop, page skipped, audit continues |
-| Lighthouse throws                   | RunnerError                         | Caught at per-page loop, page skipped, audit continues |
-| Static server fails to start        | RunnerError                         | Propagates to CLI top-level handler, exit code 2       |
-| --build and --url both set          | (console.error, no throw)           | Print error message, exit code 2 immediately           |
-| --build set but path does not exist | RunnerError (from serveStaticBuild) | Propagates to CLI top-level handler, exit code 2       |
+| Failure                             | Error class                         | Behavior                                                             |
+| ----------------------------------- | ----------------------------------- | -------------------------------------------------------------------- |
+| Browser fails to launch             | RunnerError                         | Caught at per-page loop, errored PageResult emitted, audit continues |
+| axe-core throws during audit        | RunnerError                         | Caught at per-page loop, errored PageResult emitted, audit continues |
+| Lighthouse throws                   | RunnerError                         | Caught at per-page loop, errored PageResult emitted, audit continues |
+| Static server fails to start        | RunnerError                         | Propagates to CLI top-level handler, exit code 2                     |
+| --build and --url both set          | (console.error, no throw)           | Print error message, exit code 2 immediately                         |
+| --build set but path does not exist | RunnerError (from serveStaticBuild) | Propagates to CLI top-level handler, exit code 2                     |
 
 The static server failure is not isolated like per-page runner failures. If the server cannot start, the entire run fails because there is nothing to audit. This is intentional.
 
@@ -142,16 +144,22 @@ The static server failure is not isolated like per-page runner failures. If the 
 **tests/runner/index.test.ts (new file):**
 
 - `runAudit` continues to next URL when one page throws `RunnerError`
-- `runAudit` returns results only for successful pages
-- Skipped page is logged to stderr with `[foxhole]` prefix and URL
-- `runAudit` with all pages failing returns empty array (no throw)
+- `runAudit` returns one `PageResult` per input URL; failed pages have `status: "errored"` with non-null `error.message`, empty `findings`, all-null `metrics`, and `categories` where every requested check has `status: "errored"`
+- Failed page is logged to stderr with `[foxhole]` prefix and URL
+- `runAudit` with all pages failing returns an array of all-errored `PageResult` entries (no throw)
 
 **tests/cli/run.test.ts (new file):**
 
 - `--build` and `--url` both set exits with code 2
+- `--url` and `--urls` both set exits with code 2
+- `--build` set without `--urls` exits with code 2
 - `--build` set calls `serveStaticBuild` with the provided path
 - `serveStaticBuild` close function is called after audit completes
 - `serveStaticBuild` close function is called even if audit throws
+
+**tests/fixtures/static/index.html (new file):**
+
+- Five-line minimal HTML page with an `<h1>`, a `<p>`, and an `<img>` with `alt` text. Exists so the manual verification command in section 7 has a target.
 
 All existing tests must continue to pass without modification.
 
@@ -178,10 +186,10 @@ foxhole run --build ./tests/fixtures/static --urls /index.html --output json
 foxhole run --urls https://example.com,https://localhost:9999/unreachable --output json
 ```
 
-The second command should complete and produce a report for `example.com` only, with a stderr message indicating the unreachable URL was skipped.
+The second command should complete and produce a report with two `pages` entries. The `example.com` entry has `status: "ok"` with findings; the unreachable URL entry has `status: "errored"` with the error message in `error.message`. A stderr line logs the failed URL.
 
 ---
 
 ## 8. Open questions
 
-None. All decisions are resolved per ADR-003 (error handling strategy) and ADR-008 (no crawling). Proceed to `/cmd-implement`.
+None. All decisions are resolved per ADR-003 (error handling strategy) and ADR-008 (no crawling). Proceed to `/flow:implement`.

@@ -14,7 +14,7 @@ Works standalone as a CLI, integrates into CI pipelines, and exposes an MCP serv
 npm install -g foxhole
 ```
 
-Requires Node.js 18 or later. Playwright installs Chromium automatically on first run.
+Requires Node.js 20 or later. Playwright installs Chromium automatically on first run.
 
 ---
 
@@ -53,15 +53,21 @@ Runs an audit against a URL, a list of URLs, or a local build directory.
 
 ```
 Options:
-  --url        Single target URL
-  --urls       Comma-separated list of URLs or paths (SPA routes)
-  --build      Path to a static build directory, spins up a local server
-  --checks     Subset of checks to run: perf, a11y, semantic, bundle (default: all)
-  --output     Output format: json | markdown | pdf (default: markdown)
-  --out        File path for output (default: stdout)
-  --config     Path to foxhole.config.json
-  --threshold  Exit with code 1 if score drops below this value (useful in CI)
-  --quiet      Suppress progress output
+  --url           Single target URL
+  --urls          Comma-separated list of URLs or paths (SPA routes)
+  --build         Path to a static build directory, spins up a local server
+  --checks        Subset of checks to run: perf, a11y, semantic, bundle (default: all)
+  --output        Output format: json | markdown (default: markdown)
+  --out           File path for output (default: stdout)
+  --config        Path to foxhole.config.json
+  --threshold     Exit with code 1 if score drops below this value (useful in CI)
+  --source-maps   Source map resolution: auto | on | off (default: auto)
+  --concurrency   Number of pages to audit in parallel (default: 1)
+  --perf-runs     Number of Lighthouse runs per page; median is reported (default: 1)
+  --perf-profile  Lighthouse throttling profile: fast | standard | mobile (default: standard)
+  --wait-for      CSS selector to wait for before running checks
+  --wait-timeout  Milliseconds to wait for navigation and selectors (default: 30000)
+  --quiet         Suppress progress output
 ```
 
 ### `foxhole compare`
@@ -79,7 +85,7 @@ Renders a report from a saved JSON result without re-running the audit.
 
 ```bash
 foxhole report ./audit.json
-foxhole report ./audit.json --output pdf --out ./report.pdf
+foxhole report ./audit.json --output markdown --out ./report.md
 ```
 
 ### `foxhole init`
@@ -227,8 +233,16 @@ foxhole run --build ./dist --urls /login,/dashboard,/settings
 
 ## Requirements
 
-- Node.js 18 or later
+- Node.js 20 or later
 - Chromium (installed automatically by Playwright on first run)
+
+---
+
+## Known limitations
+
+- Cross-origin source maps are not fetched. Findings on bundles whose source maps live on a different origin will surface with the bundled coordinates rather than the original source.
+- `--build` mode serves static files only. There is no server-side renderer and no proxy for backend API requests; pages that depend on either need to be audited against a running environment.
+- Lighthouse performance scores have inherent variance from one run to the next. Use `--perf-runs` to average multiple runs when a stable number matters.
 
 ---
 
