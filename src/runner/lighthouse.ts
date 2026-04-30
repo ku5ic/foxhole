@@ -23,7 +23,10 @@ function mapLighthouseScoreToSeverity(score: number | null): Severity {
   return "minor";
 }
 
-function extractMetrics(audits: Record<string, LighthouseAudit>, categories: Record<string, { score: number | null }>): PerformanceMetrics {
+function extractMetrics(
+  audits: Record<string, LighthouseAudit>,
+  categories: Record<string, { score: number | null }>,
+): PerformanceMetrics {
   return {
     lcp: audits["largest-contentful-paint"]?.numericValue ?? null,
     fid: audits["max-potential-fid"]?.numericValue ?? null,
@@ -31,12 +34,12 @@ function extractMetrics(audits: Record<string, LighthouseAudit>, categories: Rec
     fcp: audits["first-contentful-paint"]?.numericValue ?? null,
     ttfb: audits["server-response-time"]?.numericValue ?? null,
     tbt: audits["total-blocking-time"]?.numericValue ?? null,
-    performance_score: categories.performance?.score == null
-      ? null
-      : Math.round(categories.performance.score * 100),
-    accessibility_score: categories.accessibility?.score == null
-      ? null
-      : Math.round(categories.accessibility.score * 100),
+    performance_score:
+      categories.performance?.score == null ? null : Math.round(categories.performance.score * 100),
+    accessibility_score:
+      categories.accessibility?.score == null
+        ? null
+        : Math.round(categories.accessibility.score * 100),
     bundle_size: null,
   };
 }

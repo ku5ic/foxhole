@@ -1,14 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { chromium } from "playwright";
 import type { Browser, Page } from "playwright";
 
 import { createBrowser, createPage, waitForPageReady } from "../../src/runner/browser.js";
 import { RunnerError } from "../../src/errors.js";
 
+const { mockLaunch } = vi.hoisted(() => ({ mockLaunch: vi.fn() }));
+
 vi.mock("playwright", () => ({
-  chromium: {
-    launch: vi.fn(),
-  },
+  chromium: { launch: mockLaunch },
 }));
 
 beforeEach(() => {
@@ -18,7 +17,7 @@ beforeEach(() => {
 describe("createBrowser", () => {
   it("throws RunnerError with the original cause when chromium.launch rejects", async () => {
     const cause = new Error("playwright launch failed");
-    vi.mocked(chromium.launch).mockRejectedValue(cause);
+    mockLaunch.mockRejectedValue(cause);
 
     await expect(createBrowser()).rejects.toMatchObject({
       message: "Failed to launch browser",

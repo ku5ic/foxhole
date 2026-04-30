@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { MockInstance } from "vitest";
 
 import { handleRun } from "../../src/cli/commands/run.js";
 import { serveStaticBuild } from "../../src/server/static.js";
@@ -40,9 +41,11 @@ class ProcessExit extends Error {
   }
 }
 
+let stderrSpy: MockInstance;
+
 beforeEach(() => {
   vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExit(typeof code === "number" ? code : 0);
   });
@@ -56,38 +59,32 @@ afterEach(() => {
 describe("handleRun input validation", () => {
   it("exits with code 2 when no input flag is provided", async () => {
     await expect(handleRun({})).rejects.toMatchObject({ code: 2 });
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      "Error: one of --url, --urls, or --build is required\n",
-    );
+    expect(stderrSpy).toHaveBeenCalledWith("Error: one of --url, --urls, or --build is required\n");
   });
 
   it("exits with code 2 when --url and --urls are both set", async () => {
     await expect(handleRun({ url: "https://a.com", urls: "https://b.com" })).rejects.toMatchObject({
       code: 2,
     });
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      "Error: --url and --urls are mutually exclusive\n",
-    );
+    expect(stderrSpy).toHaveBeenCalledWith("Error: --url and --urls are mutually exclusive\n");
   });
 
   it("exits with code 2 when --build and --url are both set", async () => {
     await expect(handleRun({ build: "./dist", url: "https://a.com" })).rejects.toMatchObject({
       code: 2,
     });
-    expect(process.stderr.write).toHaveBeenCalledWith(
-      "Error: --url and --build are mutually exclusive\n",
-    );
+    expect(stderrSpy).toHaveBeenCalledWith("Error: --url and --build are mutually exclusive\n");
   });
 
   it("exits with code 2 when --build is set without --urls", async () => {
     await expect(handleRun({ build: "./dist" })).rejects.toMatchObject({ code: 2 });
-    expect(process.stderr.write).toHaveBeenCalledWith("Error: --build requires --urls\n");
+    expect(stderrSpy).toHaveBeenCalledWith("Error: --build requires --urls\n");
   });
 });
 
 describe("handleRun --build lifecycle", () => {
   it("starts the static server, prefixes relative URLs, and closes the server after the audit", async () => {
-    const close = vi.fn().mockResolvedValue(undefined);
+    const close = vi.fn(() => Promise.resolve());
     vi.mocked(serveStaticBuild).mockResolvedValue({ url: "http://localhost:1234", close });
     vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
 
@@ -110,7 +107,7 @@ describe("handleRun --build lifecycle", () => {
   });
 
   it("closes the server even when the audit throws", async () => {
-    const close = vi.fn().mockResolvedValue(undefined);
+    const close = vi.fn(() => Promise.resolve());
     vi.mocked(serveStaticBuild).mockResolvedValue({ url: "http://localhost:1234", close });
     vi.mocked(buildAuditReport).mockRejectedValue(new Error("audit blew up"));
 

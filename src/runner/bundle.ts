@@ -108,7 +108,8 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
       effort: "medium",
       title: "Total CSS transfer size exceeds 100 KB",
       description: `Total CSS transferred is ${formatKb(totalCss)}, which exceeds the 100 KB threshold.`,
-      recommendation: "Remove unused CSS, split critical from non-critical styles, and load non-critical CSS asynchronously.",
+      recommendation:
+        "Remove unused CSS, split critical from non-critical styles, and load non-critical CSS asynchronously.",
       selector: null,
       wcag: null,
       impact: null,

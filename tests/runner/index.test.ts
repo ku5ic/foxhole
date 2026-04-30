@@ -7,7 +7,7 @@ import { RunnerError } from "../../src/errors.js";
 vi.mock("../../src/runner/browser.js", () => ({
   createBrowser: vi.fn(),
   createPage: vi.fn(),
-  waitForPageReady: vi.fn().mockResolvedValue(undefined),
+  waitForPageReady: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("../../src/runner/axe.js", () => ({
@@ -50,20 +50,20 @@ interface FakeBrowser {
 
 function makeFakePage(): FakePage {
   return {
-    goto: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
+    goto: vi.fn(() => Promise.resolve()),
+    close: vi.fn(() => Promise.resolve()),
   };
 }
 
 function makeFakeBrowser(): FakeBrowser {
   return {
-    close: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn(() => Promise.resolve()),
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(createPage).mockImplementation(async () => makeFakePage() as never);
+  vi.mocked(createPage).mockImplementation(() => Promise.resolve(makeFakePage() as never));
 });
 
 describe("runAudit", () => {
