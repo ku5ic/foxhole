@@ -38,6 +38,8 @@ bin/
 dist/               Compiled output, gitignored
 ```
 
+`PHASES.md` is at the repository root by convention; it is the public roadmap.
+
 ## Skills
 
 Load the relevant skill before working in each area. Skills contain the decisions that must be consistent across every session.

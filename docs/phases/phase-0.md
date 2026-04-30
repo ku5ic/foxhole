@@ -16,22 +16,22 @@ Close the four known gaps from the scaffold before any feature work begins. This
 
 **Modified:**
 
-- `src/cli/commands/run.ts` -- wire `--build` flag to `serveStaticBuild`, tear down server after run
-- `src/runner/index.ts` -- wrap per-page run in try/catch, catch `RunnerError`, isolate failures, continue to next page
-- `src/runner/axe.ts` -- replace raw throws with `RunnerError`
-- `src/runner/lighthouse.ts` -- replace raw throws with `RunnerError`
-- `src/runner/semantic.ts` -- replace raw throws with `RunnerError`
-- `src/runner/bundle.ts` -- replace raw throws with `RunnerError`
-- `src/runner/browser.ts` -- replace raw throws with `RunnerError`
-- `README.md` -- add known limitations section
+- `src/cli/commands/run.ts`: wire `--build` flag to `serveStaticBuild`, tear down server after run
+- `src/runner/index.ts`: wrap per-page run in try/catch, catch `RunnerError`, isolate failures, continue to next page
+- `src/runner/axe.ts`: replace raw throws with `RunnerError`
+- `src/runner/lighthouse.ts`: replace raw throws with `RunnerError`
+- `src/runner/semantic.ts`: replace raw throws with `RunnerError`
+- `src/runner/bundle.ts`: replace raw throws with `RunnerError`
+- `src/runner/browser.ts`: replace raw throws with `RunnerError`
+- `README.md`: add known limitations section
 
 **Not touched:**
 
-- `src/types/index.ts` -- no schema changes
-- `src/audit/` -- no audit logic changes
-- `src/mcp/` -- no MCP changes
-- `src/config/` -- no config changes
-- All test files -- existing tests must continue to pass; new tests added for error paths
+- `src/types/index.ts`: no schema changes
+- `src/audit/`: no audit logic changes
+- `src/mcp/`: no MCP changes
+- `src/config/`: no config changes
+- All test files: existing tests must continue to pass; new tests added for error paths
 
 ---
 
@@ -94,9 +94,9 @@ run command (--build set)
   prepend server url to each relative path in --urls
   |
   try {
-    runAudit(options)  -- existing flow, unchanged
+    runAudit(options)  // existing flow, unchanged
   } finally {
-    close()            -- guaranteed cleanup
+    close()            // guaranteed cleanup
   }
 ```
 
