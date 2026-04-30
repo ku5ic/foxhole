@@ -71,9 +71,7 @@ const tools = [
 MCP tools return errors as structured objects, not thrown exceptions.
 
 ```typescript
-type ToolResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string; code: string };
+type ToolResult<T> = { success: true; data: T } | { success: false; error: string; code: string };
 ```
 
 ## Rules

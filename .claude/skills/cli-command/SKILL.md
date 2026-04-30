@@ -20,15 +20,8 @@ function createRunCommand(): Command {
     .option("--url <url>", "target URL")
     .option("--urls <urls>", "comma-separated list of URLs or paths")
     .option("--build <path>", "path to static build directory")
-    .option(
-      "--checks <checks>",
-      "comma-separated checks: perf,a11y,semantic,bundle",
-    )
-    .option(
-      "--output <format>",
-      "output format: json | markdown | pdf",
-      "markdown",
-    )
+    .option("--checks <checks>", "comma-separated checks: perf,a11y,semantic,bundle")
+    .option("--output <format>", "output format: json | markdown | pdf", "markdown")
     .option("--out <path>", "file path for output")
     .option("--config <path>", "path to foxhole.config.json")
     .option("--threshold <n>", "fail if score drops below this value", parseInt)
@@ -105,10 +98,7 @@ async function writeOutput(
   format: OutputFormat,
   outPath: string | undefined,
 ): Promise<void> {
-  const content =
-    format === "json"
-      ? JSON.stringify(report, null, 2)
-      : renderMarkdown(report);
+  const content = format === "json" ? JSON.stringify(report, null, 2) : renderMarkdown(report);
 
   if (outPath) {
     await fs.writeFile(outPath, content, "utf8");
