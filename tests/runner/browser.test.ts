@@ -2,11 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { chromium } from "playwright";
 import type { Browser, Page } from "playwright";
 
-import {
-  createBrowser,
-  createPage,
-  waitForPageReady,
-} from "../../src/runner/browser.js";
+import { createBrowser, createPage, waitForPageReady } from "../../src/runner/browser.js";
 import { RunnerError } from "../../src/errors.js";
 
 vi.mock("playwright", () => ({
