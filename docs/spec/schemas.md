@@ -134,7 +134,7 @@ export interface PerformanceMetrics {
 
 Every field is nullable because every field can be missing for a legitimate reason (the corresponding check did not run, the metric is unavailable in lab conditions, or the runner errored).
 
-`accessibility_score` is Lighthouse's own a11y score, captured as a metric for completeness. It is not the score Foxhole computes for the `a11y` category, which is derived from finding severity and count via `audit/score.ts`. The two scores will frequently differ; the documentation explains this.
+`accessibility_score` is Lighthouse's own a11y score, captured as a metric for completeness. It is not the score Foxhole computes for the `a11y` category, which is derived from finding severity and count via `audit/score.ts`. Consumers comparing the two scores should expect divergence; the rendering layer surfaces both.
 
 `bundle_size` is transferred bytes per the v1 spec decision. Decoded and gzipped sizes are not reported. If a future version adds them, they go on a new structured `BundleBreakdown` object, not as additional top-level fields.
 
@@ -167,6 +167,7 @@ export interface RunMeta {
   foxhole_version: string;
   node_version: string;
   platform: string; // process.platform + arch, e.g. "darwin-arm64"
+  audited_at: string; // ISO 8601 timestamp of when the run started
   input_mode: InputMode;
   checks_run: CheckCategory[]; // categories actually executed (excludes skipped)
   page_count: number;
@@ -231,10 +232,8 @@ Four changes from the v1 spec draft:
 
 1. `before_meta` and `after_meta` are added. The diff needs to surface what configurations were compared.
 2. `comparable` and `comparability_notes` are added. If perf profiles differ between the two runs, or axe versions differ significantly, the diff is suspect. The flag lets consumers decide what to do; the notes explain why.
-3. `audited_at` was added to `RunMeta` implicitly via this `Pick`. To make it real, see section 1.8 update below.
+3. `audited_at` is referenced here via `Pick` and defined in section 1.8.
 4. `metrics_delta` is `Partial<PerformanceMetrics>` with null entries omitted. Only metrics that changed appear.
-
-The `audited_at` field is missing from `RunMeta` as currently drafted. Adding it now: insert `audited_at: string;` after `platform` in the `RunMeta` interface above. ISO 8601 timestamp of when the run started.
 
 ## 2. Finding ID generation
 
