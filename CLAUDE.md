@@ -4,7 +4,7 @@ Frontend audit CLI and MCP server. Audits URLs, local builds, and SPA route list
 
 ## Stack
 
-- Runtime: Node.js 18+
+- Runtime: Node.js 20+
 - Language: TypeScript (strict)
 - Browser automation: Playwright
 - Accessibility: axe-core
@@ -24,7 +24,7 @@ src/
   report/           Markdown renderer only.
   mcp/              MCP server and tool definitions
   config/           Config loading, defaults, Zod schema
-  types/            Canonical schema types — source of truth for all data shapes
+  types/            Type definitions, matching docs/spec/schemas.md
 
 tests/
   runner/           Runner unit tests
@@ -62,7 +62,7 @@ These are non-negotiable and apply to every task.
 - Playwright is imported only in src/runner/browser.ts.
 - MCP tools delegate to src/audit/, never directly to src/runner/.
 - CLI commands are thin. No business logic in command files.
-- The canonical types live in src/types/index.ts. Do not redefine them locally.
+- Shared types live in src/types/index.ts. Do not redefine them locally.
 - No default exports anywhere in the codebase.
 - No `any`. No non-null assertions. Explicit return types on every function.
 
@@ -92,7 +92,9 @@ CLI flags / MCP input
 
 ## Schema
 
-The canonical schema is in src/types/index.ts. Read it before any task that touches data shapes. Never deviate from the schema without an explicit instruction to change it. Schema changes are breaking changes.
+The data contract is canonical in `docs/spec/schemas.md`. Runtime validation lives in `src/types/schema.ts` (Zod schemas; landed in Phase 1). TypeScript types in `src/types/index.ts` are derived from Zod via `z.infer` once Phase 1 lands; until then, `src/types/index.ts` is hand-maintained to match the spec, and any divergence is a bug in `src/types`.
+
+Read `docs/spec/schemas.md` before any task that touches data shapes. Schema changes are breaking changes.
 
 Key types: `Finding`, `Fix`, `CategorySummary`, `PerformanceMetrics`, `PageResult`, `RunMeta`, `AuditReport`, `RunDiff`.
 
