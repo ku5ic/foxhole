@@ -12,8 +12,8 @@ Known gaps carried into Phase 0:
 
 - `--build` flag is not wired to `serveStaticBuild` in the run command
 - Error handling is inconsistent across the runner layer (runners throw raw errors rather than typed `RunnerError`)
-- Lighthouse uses a separate Chrome instance from Playwright (tracked, deferred per ADR-005)
-- axe effort estimation defaults to "medium" (tracked, low priority)
+- Lighthouse + Playwright unification (closed by docs/spec/architecture.md section 13.4; verify in Phase 1)
+- axe effort estimation defaults to "medium" (must be resolved before v1.0.0; catalog-driven per docs/spec/architecture.md section 5.3)
 
 ---
 
@@ -61,8 +61,9 @@ Known gaps carried into Phase 0:
 - `foxhole run --url https://example.com --checks a11y --output json` produces valid JSON with at least one finding or an empty findings array (no crash)
 - `foxhole run --url https://example.com --checks perf --output json` produces valid JSON with populated `metrics` fields
 - All four runners produce `Finding[]` that validate against the `Finding` type
-- Finding IDs follow the `{category}-{rule-id}` format per ADR-002
+- Finding IDs are stable 16-hex-char hashes computed per docs/spec/schemas.md section 2
 - Severity mapping matches the finding-normalization skill exactly
+- When a runner throws, the resulting `CategorySummary` for that category has `status: "errored"` with the error message captured per docs/spec/architecture.md section 6.3 and docs/spec/schemas.md section 1.5
 
 ### Relevant decisions
 
@@ -142,6 +143,7 @@ Known gaps carried into Phase 0:
 - `foxhole run --build ./dist --urls /login,/dashboard` starts a local server, audits both routes, and exits cleanly
 - The static server is shut down after the run regardless of success or failure
 - Overall score is the average of per-page scores
+- When one URL is unreachable, the resulting `AuditReport.pages` entry for that URL has `status: "errored"` with the error message in `error.message`, and the overall run continues per docs/spec/architecture.md section 6.3
 
 ### Relevant decisions
 
@@ -168,6 +170,7 @@ Known gaps carried into Phase 0:
 - Improvements (resolved findings in after) are correctly identified
 - Score delta is correct
 - Metrics delta is computed for all non-null fields
+- The produced `RunDiff` includes `before_meta`, `after_meta`, and a `comparable` flag with `comparability_notes` populated when the two runs use different `perf_profile` or substantially different vendor versions, per docs/spec/schemas.md section 1.10
 
 ### Relevant decisions
 
@@ -232,9 +235,6 @@ Known gaps carried into Phase 0:
 These items are explicitly deferred. Do not build toward them without a decision to begin a new phase.
 
 - Automatic SPA crawling (ADR-008)
-- Lighthouse + Playwright browser unification (ADR-005)
 - `--push` flag and hosted layer (ADR-007)
-- axe effort estimation improvement (currently defaults to "medium")
 - Configurable wait buffer (currently fixed at 500ms per ADR-004)
-- PDF output format
 - Per-selector finding deduplication across multiple axe violations
