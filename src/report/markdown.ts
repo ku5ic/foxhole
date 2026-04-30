@@ -72,9 +72,24 @@ function renderCategories(categories: CategorySummary[]): string {
   ];
 
   for (const cat of categories) {
-    lines.push(
-      `| ${CATEGORY_LABELS[cat.category]} | ${String(cat.score)} | ${String(cat.critical_count)} | ${String(cat.major_count)} | ${String(cat.minor_count)} |`,
-    );
+    if (cat.status === "errored") {
+      lines.push(`| ${CATEGORY_LABELS[cat.category]} | errored | - | - | - |`);
+    } else {
+      lines.push(
+        `| ${CATEGORY_LABELS[cat.category]} | ${String(cat.score)} | ${String(cat.critical_count)} | ${String(cat.major_count)} | ${String(cat.minor_count)} |`,
+      );
+    }
+  }
+
+  const erroredEntries = categories.filter(
+    (c): c is CategorySummary & { error: { message: string } } =>
+      c.status === "errored" && c.error !== null,
+  );
+  if (erroredEntries.length > 0) {
+    lines.push("", "**Errors:**", "");
+    for (const cat of erroredEntries) {
+      lines.push(`- ${CATEGORY_LABELS[cat.category]}: ${cat.error.message}`);
+    }
   }
 
   lines.push("");
@@ -147,12 +162,7 @@ function renderFindings(findings: Finding[]): string {
 }
 
 function renderMetrics(metrics: PerformanceMetrics): string {
-  const lines = [
-    "## Performance metrics",
-    "",
-    "| Metric | Value |",
-    "| --- | --- |",
-  ];
+  const lines = ["## Performance metrics", "", "| Metric | Value |", "| --- | --- |"];
 
   if (metrics.lcp !== null) lines.push(`| LCP | ${formatMs(metrics.lcp)} |`);
   if (metrics.fcp !== null) lines.push(`| FCP | ${formatMs(metrics.fcp)} |`);
