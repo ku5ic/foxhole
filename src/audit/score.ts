@@ -4,6 +4,8 @@ const CRITICAL_PENALTY = 15;
 const MAJOR_PENALTY = 8;
 const MINOR_PENALTY = 2;
 
+const ALL_CATEGORIES: CheckCategory[] = ["a11y", "perf", "semantic", "bundle"];
+
 function scoreFindings(findings: Finding[]): number {
   let score = 100;
 
@@ -41,10 +43,37 @@ function buildCategorySummary(category: CheckCategory, findings: Finding[]): Cat
   };
 }
 
-function scorePage(pageResult: PageResult): PageResult {
-  const score = scoreFindings(pageResult.findings);
-  const presentCategories = [...new Set(pageResult.findings.map((f) => f.category))];
-  const categories = presentCategories.map((cat) => buildCategorySummary(cat, pageResult.findings));
+function buildSkippedCategorySummary(category: CheckCategory): CategorySummary {
+  return {
+    category,
+    status: "skipped",
+    error: null,
+    score: 0,
+    findings_count: 0,
+    critical_count: 0,
+    major_count: 0,
+    minor_count: 0,
+  };
+}
+
+function scorePage(
+  pageResult: PageResult,
+  requestedChecks: CheckCategory[] = ALL_CATEGORIES,
+): PageResult {
+  const erroredByCategory = new Map<CheckCategory, CategorySummary>(
+    pageResult.categories.filter((c) => c.status === "errored").map((c) => [c.category, c]),
+  );
+
+  const categories: CategorySummary[] = ALL_CATEGORIES.map((cat) => {
+    const errored = erroredByCategory.get(cat);
+    if (errored !== undefined) return errored;
+    if (!requestedChecks.includes(cat)) return buildSkippedCategorySummary(cat);
+    return buildCategorySummary(cat, pageResult.findings);
+  });
+
+  const okScores = categories.filter((c) => c.status === "ok").map((c) => c.score);
+  const score =
+    okScores.length > 0 ? Math.round(okScores.reduce((sum, s) => sum + s, 0) / okScores.length) : 0;
 
   return {
     ...pageResult,
@@ -55,8 +84,10 @@ function scorePage(pageResult: PageResult): PageResult {
 
 function scoreReport(pages: PageResult[]): number {
   if (pages.length === 0) return 100;
-  const total = pages.reduce((sum, page) => sum + page.score, 0);
-  return Math.round(total / pages.length);
+  const okPages = pages.filter((p) => p.status === "ok");
+  if (okPages.length === 0) return 0;
+  const total = okPages.reduce((sum, page) => sum + page.score, 0);
+  return Math.round(total / okPages.length);
 }
 
 export { scoreFindings, scorePage, scoreReport };
