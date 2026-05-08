@@ -4,6 +4,7 @@ import { renderMarkdownReport } from "../../src/report/markdown.js";
 import type {
   AuditReport,
   CategorySummary,
+  Finding,
   PageResult,
   PerformanceMetrics,
 } from "../../src/types/index.js";
@@ -53,14 +54,47 @@ function erroredCategory(
   };
 }
 
-function makePage(categories: CategorySummary[]): PageResult {
+function skippedCategory(overrides: Partial<CategorySummary> = {}): CategorySummary {
+  return {
+    category: "perf",
+    status: "skipped",
+    error: null,
+    score: 0,
+    findings_count: 0,
+    critical_count: 0,
+    major_count: 0,
+    minor_count: 0,
+    ...overrides,
+  };
+}
+
+function makeFinding(overrides: Partial<Finding> = {}): Finding {
+  return {
+    id: "abc123",
+    category: "a11y",
+    severity: "minor",
+    effort: "low",
+    rule_id: "a11y/test",
+    title: "Test finding",
+    description: "A test finding.",
+    recommendation: "Fix it.",
+    selector: null,
+    wcag: null,
+    impact: null,
+    source: null,
+    url: "https://example.com",
+    ...overrides,
+  };
+}
+
+function makePage(categories: CategorySummary[], findings: Finding[] = []): PageResult {
   return {
     url: "https://example.com",
-    status: categories.some((c) => c.status === "errored") ? "errored" : "ok",
+    status: "ok",
     error: null,
     score: 80,
     categories,
-    findings: [],
+    findings,
     metrics: emptyMetrics(),
     audited_at: "2026-04-30T00:00:00.000Z",
     duration_ms: 0,
@@ -132,5 +166,75 @@ describe("renderMarkdownReport categories table", () => {
     const output = renderMarkdownReport(report);
 
     expect(output).not.toContain("**Errors:**");
+  });
+
+  it("omits skipped categories from the table", () => {
+    const report = makeReport([
+      makePage([
+        okCategory({ category: "a11y", score: 90 }),
+        skippedCategory({ category: "perf" }),
+        skippedCategory({ category: "semantic" }),
+        skippedCategory({ category: "bundle" }),
+      ]),
+    ]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("| Accessibility | 90 |");
+    expect(output).not.toContain("| Performance |");
+    expect(output).not.toContain("| Semantic HTML |");
+    expect(output).not.toContain("| Bundle |");
+  });
+
+  it("renders no categories section when all categories are skipped", () => {
+    const report = makeReport([
+      makePage([
+        skippedCategory({ category: "a11y" }),
+        skippedCategory({ category: "perf" }),
+        skippedCategory({ category: "semantic" }),
+        skippedCategory({ category: "bundle" }),
+      ]),
+    ]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).not.toContain("## Categories");
+  });
+
+  it("renders errored categories while still omitting skipped ones", () => {
+    const report = makeReport([
+      makePage([
+        erroredCategory("axe crashed", { category: "a11y" }),
+        skippedCategory({ category: "perf" }),
+        skippedCategory({ category: "semantic" }),
+        skippedCategory({ category: "bundle" }),
+      ]),
+    ]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("| Accessibility | errored |");
+    expect(output).not.toContain("| Performance |");
+  });
+});
+
+describe("renderMarkdownReport findings - source location", () => {
+  it("renders no source line when source is null", () => {
+    const report = makeReport([makePage([okCategory()], [makeFinding({ source: null })])]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).not.toContain("**Source:**");
+  });
+
+  it("renders source file, line, and column when source is non-null", () => {
+    const finding = makeFinding({
+      source: { file: "src/components/Button.tsx", line: 42, column: 8, snippet: null },
+    });
+    const report = makeReport([makePage([okCategory()], [finding])]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("**Source:** src/components/Button.tsx:42:8");
   });
 });

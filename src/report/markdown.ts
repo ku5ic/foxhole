@@ -62,7 +62,8 @@ function renderScore(report: AuditReport): string {
 }
 
 function renderCategories(categories: CategorySummary[]): string {
-  if (categories.length === 0) return "";
+  const renderable = categories.filter((c) => c.status !== "skipped");
+  if (renderable.length === 0) return "";
 
   const lines = [
     "## Categories",
@@ -71,7 +72,7 @@ function renderCategories(categories: CategorySummary[]): string {
     "| --- | --- | --- | --- | --- |",
   ];
 
-  for (const cat of categories) {
+  for (const cat of renderable) {
     if (cat.status === "errored") {
       lines.push(`| ${CATEGORY_LABELS[cat.category]} | errored | - | - | - |`);
     } else {
@@ -81,7 +82,7 @@ function renderCategories(categories: CategorySummary[]): string {
     }
   }
 
-  const erroredEntries = categories.filter(
+  const erroredEntries = renderable.filter(
     (c): c is CategorySummary & { error: { message: string } } =>
       c.status === "errored" && c.error !== null,
   );
@@ -153,6 +154,10 @@ function renderFindings(findings: Finding[]): string {
       }
       if (finding.wcag) {
         lines.push(`**WCAG:** ${finding.wcag}`);
+      }
+      if (finding.source) {
+        const loc = `${finding.source.file}:${String(finding.source.line)}:${String(finding.source.column)}`;
+        lines.push(`**Source:** ${loc}`);
       }
       lines.push(`**Recommendation:** ${finding.recommendation}`, "", "---", "");
     }
