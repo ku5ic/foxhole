@@ -168,6 +168,18 @@ function buildBundleFindings(
   return findings;
 }
 
+function deduplicateResources(resources: ResourceInfo[]): ResourceInfo[] {
+  const seen = new Map<string, ResourceInfo>();
+  for (const resource of resources) {
+    const key = sanitizeResourceUrl(resource.url);
+    const existing = seen.get(key);
+    if (!existing || resource.size > existing.size) {
+      seen.set(key, resource);
+    }
+  }
+  return [...seen.values()];
+}
+
 async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunnerResult> {
   const jsResources: ResourceInfo[] = [];
   const cssResources: ResourceInfo[] = [];
@@ -207,8 +219,12 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
     throw new RunnerError(`Failed to load page for bundle analysis: ${pageUrl}`, cause);
   }
 
-  const findings = buildBundleFindings(jsResources, cssResources, httpResources, pageUrl);
-  const totalJs = jsResources.reduce((sum, r) => sum + r.size, 0);
+  const uniqueJs = deduplicateResources(jsResources);
+  const uniqueCss = deduplicateResources(cssResources);
+  const uniqueHttp = [...new Set(httpResources)];
+
+  const findings = buildBundleFindings(uniqueJs, uniqueCss, uniqueHttp, pageUrl);
+  const totalJs = uniqueJs.reduce((sum, r) => sum + r.size, 0);
 
   return {
     findings,
