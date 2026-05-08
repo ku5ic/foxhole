@@ -4,7 +4,9 @@ import url from "node:url";
 
 import type { Page } from "playwright";
 
+import { catalog } from "../catalog/index.js";
 import { RunnerError } from "../errors.js";
+import { buildSemanticPath, buildTextFingerprint, computeFindingId } from "./finding-id.js";
 import type { Finding, Severity } from "../types/index.js";
 
 interface AxeRunnerResult {
@@ -39,16 +41,15 @@ function mapAxeImpactToSeverity(impact: string | undefined): Severity {
 }
 
 function extractWcag(tags: string[]): string | null {
-  const wcagTags = tags.filter((tag) => /^wcag\d/.test(tag));
-  if (wcagTags.length === 0) return null;
-
-  for (const tag of wcagTags) {
-    const match = /^wcag(\d)(\d)(\d+)$/.exec(tag);
-    if (match?.[1] && match[2] && match[3]) {
-      return `${match[1]}.${match[2]}.${match[3]}`;
-    }
+  for (const tag of tags) {
+    if (!/^wcag\d+$/.test(tag)) continue;
+    const digits = tag.slice(4);
+    if (digits.length < 3) continue;
+    const major = digits[0];
+    const minor = digits[1];
+    const clause = digits.slice(2);
+    if (major && minor) return `${major}.${minor}.${clause}`;
   }
-
   return null;
 }
 
@@ -57,20 +58,37 @@ function sanitizeSelector(selector: string): string {
 }
 
 function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Finding[] {
+  const ruleId = `a11y/${violation.id}`;
+  const entry = catalog[ruleId];
+
+  if (!entry && process.env.FOXHOLE_DEBUG === "1") {
+    process.stderr.write(`[foxhole:debug] catalog gap: ruleId=${ruleId}\n`);
+  }
+
+  const severity = entry ? entry.default_severity : mapAxeImpactToSeverity(violation.impact);
+  const effort = entry ? entry.default_effort : ("medium" as const);
+  const wcag = entry ? entry.wcag : extractWcag(violation.tags);
+  const title = entry ? entry.title_template : violation.help;
+  const description = entry ? entry.description_template : violation.description;
+  const recommendation = entry
+    ? entry.recommendation
+    : `Review this issue using axe-core documentation: ${violation.helpUrl}`;
+
   if (violation.nodes.length === 0) {
+    const textFingerprint = buildTextFingerprint({ ruleId: violation.id, detail: "" });
+    const id = computeFindingId({ pageUrl, ruleId, semanticPath: "", textFingerprint });
     return [
       {
-        id: `a11y-${violation.id}`,
+        id,
         category: "a11y",
-        severity: mapAxeImpactToSeverity(violation.impact),
-        // TODO: effort estimation will be improved in a later iteration
-        effort: "medium",
-        rule_id: `a11y/${violation.id}`,
-        title: violation.help,
-        description: violation.description,
-        recommendation: violation.help,
+        severity,
+        effort,
+        rule_id: ruleId,
+        title,
+        description,
+        recommendation,
         selector: null,
-        wcag: extractWcag(violation.tags),
+        wcag,
         impact: violation.impact ?? null,
         source: null,
         url: pageUrl,
@@ -78,22 +96,31 @@ function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Fi
     ];
   }
 
-  return violation.nodes.map((node) => ({
-    id: `a11y-${violation.id}`,
-    category: "a11y" as const,
-    severity: mapAxeImpactToSeverity(violation.impact),
-    // TODO: effort estimation will be improved in a later iteration
-    effort: "medium" as const,
-    rule_id: `a11y/${violation.id}`,
-    title: violation.help,
-    description: violation.description,
-    recommendation: violation.help,
-    selector: node.target[0] === undefined ? null : sanitizeSelector(node.target[0]),
-    wcag: extractWcag(violation.tags),
-    impact: violation.impact ?? null,
-    source: null,
-    url: pageUrl,
-  }));
+  return violation.nodes.map((node) => {
+    const selectorRaw = node.target[0];
+    const selector = selectorRaw === undefined ? null : sanitizeSelector(selectorRaw);
+    const semanticPath = buildSemanticPath(node.html);
+    const textFingerprint = buildTextFingerprint({
+      ruleId: violation.id,
+      detail: selectorRaw ?? "",
+    });
+    const id = computeFindingId({ pageUrl, ruleId, semanticPath, textFingerprint });
+    return {
+      id,
+      category: "a11y" as const,
+      severity,
+      effort,
+      rule_id: ruleId,
+      title,
+      description,
+      recommendation,
+      selector,
+      wcag,
+      impact: violation.impact ?? null,
+      source: null,
+      url: pageUrl,
+    };
+  });
 }
 
 async function runAxe(page: Page, pageUrl: string): Promise<AxeRunnerResult> {
@@ -129,5 +156,5 @@ async function runAxe(page: Page, pageUrl: string): Promise<AxeRunnerResult> {
   }
 }
 
-export { runAxe };
-export type { AxeRunnerResult };
+export { runAxe, mapAxeViolationToFindings };
+export type { AxeRunnerResult, AxeViolation, AxeNode };

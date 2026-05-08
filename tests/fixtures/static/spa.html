@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- intentionally missing <title> to trigger document-title violation -->
+  </head>
+  <body>
+    <!-- intentionally missing alt to trigger image-alt violation -->
+    <img src="hero.png" class="hero-banner" />
+    <!-- intentionally missing label to trigger label violation -->
+    <form>
+      <input type="email" id="email" />
+    </form>
+    <!-- custom unknown rule would not be triggered by real axe, used only in unit tests -->
+  </body>
+</html>
