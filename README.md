@@ -241,8 +241,11 @@ foxhole run --build ./dist --urls /login,/dashboard,/settings
 ## Known limitations
 
 - Cross-origin source maps are not fetched. Findings on bundles whose source maps live on a different origin will surface with the bundled coordinates rather than the original source.
+- `Finding.source` is always null in this release. Source map integration (mapping bundled coordinates back to original file and line) is planned for a later phase.
+- Lighthouse and Playwright open separate Chromium instances for each page audit. They do not share a browser. This costs one additional Chromium launch per page when both `perf` and other checks are requested.
 - `--build` mode serves static files only. There is no server-side renderer and no proxy for backend API requests; pages that depend on either need to be audited against a running environment.
 - Lighthouse performance scores have inherent variance from one run to the next. Use `--perf-runs` to average multiple runs when a stable number matters.
+- Bundle checks (`--checks bundle`) navigate the target page a second time in a fresh browser context to capture network responses. Pages with side effects from navigation may produce inconsistent results.
 
 ---
 

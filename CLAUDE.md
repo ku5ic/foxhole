@@ -19,6 +19,7 @@ Frontend audit CLI and MCP server. Audits URLs, local builds, and SPA route list
 src/
   cli/              CLI entry point and command handlers
   runner/           Audit runners (Playwright, Lighthouse, axe-core, semantic, bundle)
+  catalog/          Rule definitions: title, severity, effort, WCAG, recommendation
   audit/            Scoring, prioritization, summarization, diff
   server/           Local static server for --build mode
   report/           Markdown renderer only.
@@ -48,6 +49,7 @@ Load the relevant skill before working in each area. Skills contain the decision
 | ------------------------------------------------- | --------------------- |
 | Any new or modified module                        | typescript-module     |
 | Any runner file in src/runner/                    | finding-normalization |
+| Any file in src/catalog/                          | finding-normalization |
 | Any function that can fail                        | error-handling        |
 | Any file in src/cli/commands/                     | cli-command           |
 | Any file in src/mcp/tools/                        | mcp-tool              |
@@ -94,7 +96,7 @@ CLI flags / MCP input
 
 ## Schema
 
-The data contract is canonical in `docs/spec/schemas.md`. Runtime validation lives in `src/types/schema.ts` (Zod schemas; landed in Phase 1). TypeScript types in `src/types/index.ts` are derived from Zod via `z.infer` once Phase 1 lands; until then, `src/types/index.ts` is hand-maintained to match the spec, and any divergence is a bug in `src/types`.
+The data contract is canonical in `docs/spec/schemas.md`. Runtime validation lives in `src/types/schema.ts` (Zod schemas). TypeScript types in `src/types/index.ts` are derived from Zod via `z.infer` - do not hand-edit `index.ts`; edit the Zod schema and the types follow.
 
 Read `docs/spec/schemas.md` before any task that touches data shapes. Schema changes are breaking changes.
 
