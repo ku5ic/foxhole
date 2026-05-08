@@ -114,6 +114,21 @@ function diffReports(before: AuditReport, after: AuditReport): RunDiff {
   }
 
   return {
+    before_meta: {
+      foxhole_version: before.meta.foxhole_version,
+      audited_at: before.meta.audited_at,
+      perf_profile: before.meta.perf_profile,
+      dependencies: before.meta.dependencies,
+    },
+    after_meta: {
+      foxhole_version: after.meta.foxhole_version,
+      audited_at: after.meta.audited_at,
+      perf_profile: after.meta.perf_profile,
+      dependencies: after.meta.dependencies,
+    },
+    // TODO(step-12): compute comparable based on perf_profile and dependency major version diffs
+    comparable: true,
+    comparability_notes: [],
     score_delta: scoreDelta,
     passed: after.meta.passed,
     regressions,

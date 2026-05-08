@@ -72,12 +72,14 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
       category: "bundle",
       severity: "major",
       effort: "high",
+      rule_id: "bundle/total-js-size",
       title: "Total JavaScript transfer size exceeds 500 KB",
       description: `Total JavaScript transferred is ${formatKb(totalJs)}, which exceeds the 500 KB threshold.`,
       recommendation: "Split bundles, remove unused code, and lazy-load non-critical JavaScript.",
       selector: null,
       wcag: null,
       impact: null,
+      source: null,
       url: pageUrl,
     });
   }
@@ -89,12 +91,14 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
         category: "bundle",
         severity: "minor",
         effort: "medium",
+        rule_id: "bundle/large-javascript-chunk",
         title: "Single JavaScript resource exceeds 200 KB",
         description: `${resource.url} is ${formatKb(resource.size)}.`,
         recommendation: "Split this bundle into smaller chunks or lazy-load non-critical parts.",
         selector: null,
         wcag: null,
         impact: null,
+        source: null,
         url: pageUrl,
       });
     }
@@ -106,6 +110,7 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
       category: "bundle",
       severity: "minor",
       effort: "medium",
+      rule_id: "bundle/total-css-size",
       title: "Total CSS transfer size exceeds 100 KB",
       description: `Total CSS transferred is ${formatKb(totalCss)}, which exceeds the 100 KB threshold.`,
       recommendation:
@@ -113,6 +118,7 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
       selector: null,
       wcag: null,
       impact: null,
+      source: null,
       url: pageUrl,
     });
   }
@@ -123,12 +129,14 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
       category: "bundle",
       severity: "critical",
       effort: "low",
+      rule_id: "bundle/insecure-resource",
       title: "Resource loaded over insecure HTTP",
       description: `${resourceUrl} is loaded over HTTP instead of HTTPS.`,
       recommendation: "Update the resource URL to use HTTPS.",
       selector: null,
       wcag: null,
       impact: null,
+      source: null,
       url: pageUrl,
     });
   }

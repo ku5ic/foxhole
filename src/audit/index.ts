@@ -56,13 +56,20 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
     meta: {
       foxhole_version: readVersion(),
       node_version: process.version,
-      platform: process.platform,
+      platform: `${process.platform}-${process.arch}`,
+      audited_at: new Date(startTime).toISOString(),
       input_mode: determineInputMode(options.urls),
       checks_run: options.checks,
-      crawl_depth: 0,
+      page_count: options.urls.length,
       duration_ms: durationMs,
       threshold: options.threshold ?? null,
       passed,
+      concurrency: 1,
+      perf_runs: 1,
+      perf_profile: "standard",
+      source_maps: "auto",
+      // TODO(step-11): read real versions from node_modules package.json
+      dependencies: { axe_core: "0.0.0", lighthouse: "0.0.0", playwright: "0.0.0" },
     },
   };
 }

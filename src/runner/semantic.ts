@@ -178,12 +178,14 @@ function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: strin
     category: "semantic" as const,
     severity: severityForCheck(result.check),
     effort: "low" as const,
+    rule_id: `semantic/${result.check}`,
     title: titleForCheck(result.check),
     description: issue.detail,
     recommendation: recommendationForCheck(result.check),
     selector: issue.selector,
     wcag: null,
     impact: null,
+    source: null,
     url: pageUrl,
   }));
 }

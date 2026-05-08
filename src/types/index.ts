@@ -1,94 +1,35 @@
-export type CheckCategory = "perf" | "a11y" | "semantic" | "bundle";
-export type Severity = "critical" | "major" | "minor";
-export type Effort = "low" | "medium" | "high";
-export type CategoryStatus = "ok" | "errored" | "skipped";
-export type PageStatus = "ok" | "errored";
+import type { z } from "zod";
 
-export interface Finding {
-  id: string;
-  category: CheckCategory;
-  severity: Severity;
-  effort: Effort;
-  title: string;
-  description: string;
-  recommendation: string;
-  selector: string | null;
-  wcag: string | null;
-  impact: string | null;
-  url: string;
-}
+import type {
+  auditReportSchema,
+  categorySummarySchema,
+  categoryStatusSchema,
+  checkCategorySchema,
+  effortSchema,
+  findingSchema,
+  fixSchema,
+  inputModeSchema,
+  pageResultSchema,
+  performanceMetricsSchema,
+  runDiffSchema,
+  runMetaSchema,
+  severitySchema,
+  sourceLocationSchema,
+} from "./schema.js";
 
-export interface Fix {
-  rank: number;
-  finding_ids: string[];
-  title: string;
-  description: string;
-  effort: Effort;
-  severity: Severity;
-  category: CheckCategory;
-}
+export type CheckCategory = z.infer<typeof checkCategorySchema>;
+export type Severity = z.infer<typeof severitySchema>;
+export type Effort = z.infer<typeof effortSchema>;
+export type CategoryStatus = z.infer<typeof categoryStatusSchema>;
+export type InputMode = z.infer<typeof inputModeSchema>;
+export type SourceLocation = z.infer<typeof sourceLocationSchema>;
+export type Finding = z.infer<typeof findingSchema>;
+export type Fix = z.infer<typeof fixSchema>;
+export type CategorySummary = z.infer<typeof categorySummarySchema>;
+export type PerformanceMetrics = z.infer<typeof performanceMetricsSchema>;
+export type PageResult = z.infer<typeof pageResultSchema>;
+export type RunMeta = z.infer<typeof runMetaSchema>;
+export type AuditReport = z.infer<typeof auditReportSchema>;
+export type RunDiff = z.infer<typeof runDiffSchema>;
 
-export interface CategorySummary {
-  category: CheckCategory;
-  status: CategoryStatus;
-  error: { message: string } | null;
-  score: number;
-  findings_count: number;
-  critical_count: number;
-  major_count: number;
-  minor_count: number;
-}
-
-export interface PerformanceMetrics {
-  lcp: number | null;
-  fid: number | null;
-  cls: number | null;
-  fcp: number | null;
-  ttfb: number | null;
-  tbt: number | null;
-  performance_score: number | null;
-  accessibility_score: number | null;
-  bundle_size: number | null;
-}
-
-export interface PageResult {
-  url: string;
-  status: PageStatus;
-  error: { message: string } | null;
-  score: number;
-  categories: CategorySummary[];
-  findings: Finding[];
-  metrics: PerformanceMetrics;
-  audited_at: string;
-}
-
-export interface RunMeta {
-  foxhole_version: string;
-  node_version: string;
-  platform: string;
-  input_mode: "url" | "urls" | "build";
-  checks_run: CheckCategory[];
-  crawl_depth: number;
-  duration_ms: number;
-  threshold: number | null;
-  passed: boolean;
-}
-
-export interface AuditReport {
-  version: 1;
-  summary: string;
-  score: number;
-  pages: PageResult[];
-  prioritized_fixes: Fix[];
-  meta: RunMeta;
-}
-
-export interface RunDiff {
-  score_delta: number;
-  passed: boolean;
-  regressions: Finding[];
-  improvements: Finding[];
-  unchanged: Finding[];
-  metrics_delta: Partial<PerformanceMetrics>;
-  summary: string;
-}
+export type PageStatus = PageResult["status"];

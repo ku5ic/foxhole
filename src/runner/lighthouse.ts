@@ -50,12 +50,14 @@ function mapAuditToFinding(audit: LighthouseAudit, pageUrl: string): Finding {
     category: "perf",
     severity: mapLighthouseScoreToSeverity(audit.score),
     effort: "medium",
+    rule_id: `perf/${audit.id}`,
     title: audit.title,
     description: audit.description,
     recommendation: audit.title,
     selector: null,
     wcag: null,
     impact: null,
+    source: null,
     url: pageUrl,
   };
 }

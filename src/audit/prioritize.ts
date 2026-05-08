@@ -43,11 +43,13 @@ function prioritizeFindings(findings: Finding[]): Fix[] {
     fixes.push({
       rank: SEVERITY_RANK[first.severity],
       finding_ids: groupFindings.map((f) => f.id),
+      rule_id: first.rule_id,
       title: titleForGroup(first.category, first.severity, groupFindings.length),
       description: `${String(groupFindings.length)} ${first.severity} ${first.category === "a11y" ? "accessibility" : first.category} finding${groupFindings.length === 1 ? "" : "s"} that should be addressed.`,
       effort: first.effort,
       severity: first.severity,
       category: first.category,
+      pages_affected: [...new Set(groupFindings.map((f) => f.url))],
     });
   }
 

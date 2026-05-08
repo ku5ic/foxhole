@@ -65,12 +65,14 @@ function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Fi
         severity: mapAxeImpactToSeverity(violation.impact),
         // TODO: effort estimation will be improved in a later iteration
         effort: "medium",
+        rule_id: `a11y/${violation.id}`,
         title: violation.help,
         description: violation.description,
         recommendation: violation.help,
         selector: null,
         wcag: extractWcag(violation.tags),
         impact: violation.impact ?? null,
+        source: null,
         url: pageUrl,
       },
     ];
@@ -82,12 +84,14 @@ function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Fi
     severity: mapAxeImpactToSeverity(violation.impact),
     // TODO: effort estimation will be improved in a later iteration
     effort: "medium" as const,
+    rule_id: `a11y/${violation.id}`,
     title: violation.help,
     description: violation.description,
     recommendation: violation.help,
     selector: node.target[0] === undefined ? null : sanitizeSelector(node.target[0]),
     wcag: extractWcag(violation.tags),
     impact: violation.impact ?? null,
+    source: null,
     url: pageUrl,
   }));
 }

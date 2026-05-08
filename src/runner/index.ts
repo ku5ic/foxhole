@@ -61,6 +61,7 @@ function buildErroredPageResult(url: string, checks: CheckCategory[], message: s
     findings: [],
     metrics: emptyMetrics(),
     audited_at: new Date().toISOString(),
+    duration_ms: 0,
   };
 }
 
@@ -125,6 +126,7 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
           findings,
           metrics,
           audited_at: new Date().toISOString(),
+          duration_ms: 0,
         });
       } finally {
         await browser.close();

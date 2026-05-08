@@ -9,12 +9,14 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     category: "a11y",
     severity: "minor",
     effort: "low",
+    rule_id: "a11y/test",
     title: "Test finding",
     description: "A test finding.",
     recommendation: "Fix it.",
     selector: null,
     wcag: null,
     impact: null,
+    source: null,
     url: "https://example.com",
     ...overrides,
   };
@@ -44,6 +46,7 @@ function makePageResult(findings: Finding[]): PageResult {
     findings,
     metrics: emptyMetrics(),
     audited_at: "2026-04-07T00:00:00.000Z",
+    duration_ms: 0,
   };
 }
 
