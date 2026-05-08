@@ -1,11 +1,18 @@
 import type { Page, Response as PlaywrightResponse } from "playwright";
 
+import { catalog } from "../catalog/index.js";
 import { RunnerError } from "../errors.js";
+import { buildTextFingerprint, computeFindingId } from "./finding-id.js";
 import type { Finding } from "../types/index.js";
 
 interface BundleRunnerResult {
   findings: Finding[];
   bundle_size: number | null;
+}
+
+interface ResourceInfo {
+  url: string;
+  size: number;
 }
 
 const JS_CONTENT_TYPES = ["application/javascript", "text/javascript"];
@@ -23,9 +30,147 @@ function formatKb(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
+function sanitizeResourceUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    const p = parsed.pathname;
+    return p.length > 200 ? p.slice(0, 200) : p;
+  } catch {
+    const qi = rawUrl.indexOf("?");
+    const path = qi === -1 ? rawUrl : rawUrl.slice(0, qi);
+    return path.length > 200 ? path.slice(0, 200) : path;
+  }
+}
+
+function buildBundleFindings(
+  jsResources: ResourceInfo[],
+  cssResources: ResourceInfo[],
+  httpResources: string[],
+  pageUrl: string,
+): Finding[] {
+  const findings: Finding[] = [];
+  const totalJs = jsResources.reduce((sum, r) => sum + r.size, 0);
+  const totalCss = cssResources.reduce((sum, r) => sum + r.size, 0);
+
+  if (totalJs > MAX_TOTAL_JS_BYTES) {
+    const ruleId = "bundle/total-js-size";
+    const entry = catalog[ruleId];
+    const detail = formatKb(totalJs);
+    findings.push({
+      id: computeFindingId({
+        pageUrl,
+        ruleId,
+        semanticPath: "",
+        textFingerprint: buildTextFingerprint({ ruleId, detail }),
+      }),
+      category: "bundle",
+      severity: entry?.default_severity ?? "major",
+      effort: entry?.default_effort ?? "high",
+      rule_id: ruleId,
+      title: entry?.title_template ?? "Total JavaScript transfer size exceeds 500 KB",
+      description: `Total JavaScript transferred is ${detail}, which exceeds the 500 KB threshold.`,
+      recommendation:
+        entry?.recommendation ??
+        "Split bundles, remove unused code, and lazy-load non-critical JavaScript.",
+      selector: null,
+      wcag: null,
+      impact: null,
+      source: null,
+      url: pageUrl,
+    });
+  }
+
+  for (const resource of jsResources) {
+    if (resource.size > MAX_SINGLE_JS_BYTES) {
+      const ruleId = "bundle/large-javascript-chunk";
+      const entry = catalog[ruleId];
+      const sanitized = sanitizeResourceUrl(resource.url);
+      const detail = resource.url;
+      findings.push({
+        id: computeFindingId({
+          pageUrl,
+          ruleId,
+          semanticPath: sanitized,
+          textFingerprint: buildTextFingerprint({ ruleId, detail }),
+        }),
+        category: "bundle",
+        severity: entry?.default_severity ?? "minor",
+        effort: entry?.default_effort ?? "medium",
+        rule_id: ruleId,
+        title: entry?.title_template ?? "Single JavaScript resource exceeds 200 KB",
+        description: `${sanitized} is ${formatKb(resource.size)}.`,
+        recommendation:
+          entry?.recommendation ??
+          "Split this bundle into smaller chunks or lazy-load non-critical parts.",
+        selector: null,
+        wcag: null,
+        impact: null,
+        source: null,
+        url: pageUrl,
+      });
+    }
+  }
+
+  if (totalCss > MAX_TOTAL_CSS_BYTES) {
+    const ruleId = "bundle/total-css-size";
+    const entry = catalog[ruleId];
+    const detail = formatKb(totalCss);
+    findings.push({
+      id: computeFindingId({
+        pageUrl,
+        ruleId,
+        semanticPath: "",
+        textFingerprint: buildTextFingerprint({ ruleId, detail }),
+      }),
+      category: "bundle",
+      severity: entry?.default_severity ?? "minor",
+      effort: entry?.default_effort ?? "medium",
+      rule_id: ruleId,
+      title: entry?.title_template ?? "Total CSS transfer size exceeds 100 KB",
+      description: `Total CSS transferred is ${detail}, which exceeds the 100 KB threshold.`,
+      recommendation:
+        entry?.recommendation ??
+        "Remove unused CSS, split critical from non-critical styles, and load non-critical CSS asynchronously.",
+      selector: null,
+      wcag: null,
+      impact: null,
+      source: null,
+      url: pageUrl,
+    });
+  }
+
+  for (const resourceUrl of httpResources) {
+    const ruleId = "bundle/insecure-resource";
+    const entry = catalog[ruleId];
+    const sanitized = sanitizeResourceUrl(resourceUrl);
+    findings.push({
+      id: computeFindingId({
+        pageUrl,
+        ruleId,
+        semanticPath: sanitized,
+        textFingerprint: buildTextFingerprint({ ruleId, detail: resourceUrl }),
+      }),
+      category: "bundle",
+      severity: entry?.default_severity ?? "critical",
+      effort: entry?.default_effort ?? "low",
+      rule_id: ruleId,
+      title: entry?.title_template ?? "Resource loaded over insecure HTTP",
+      description: `${sanitized} is loaded over HTTP instead of HTTPS.`,
+      recommendation: entry?.recommendation ?? "Update the resource URL to use HTTPS.",
+      selector: null,
+      wcag: null,
+      impact: null,
+      source: null,
+      url: pageUrl,
+    });
+  }
+
+  return findings;
+}
+
 async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunnerResult> {
-  const jsResources: { url: string; size: number }[] = [];
-  const cssResources: { url: string; size: number }[] = [];
+  const jsResources: ResourceInfo[] = [];
+  const cssResources: ResourceInfo[] = [];
   const httpResources: string[] = [];
 
   const responseHandler = async (response: PlaywrightResponse): Promise<void> => {
@@ -62,84 +207,8 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
     throw new RunnerError(`Failed to load page for bundle analysis: ${pageUrl}`, cause);
   }
 
-  const findings: Finding[] = [];
+  const findings = buildBundleFindings(jsResources, cssResources, httpResources, pageUrl);
   const totalJs = jsResources.reduce((sum, r) => sum + r.size, 0);
-  const totalCss = cssResources.reduce((sum, r) => sum + r.size, 0);
-
-  if (totalJs > MAX_TOTAL_JS_BYTES) {
-    findings.push({
-      id: "bundle-total-js-size",
-      category: "bundle",
-      severity: "major",
-      effort: "high",
-      rule_id: "bundle/total-js-size",
-      title: "Total JavaScript transfer size exceeds 500 KB",
-      description: `Total JavaScript transferred is ${formatKb(totalJs)}, which exceeds the 500 KB threshold.`,
-      recommendation: "Split bundles, remove unused code, and lazy-load non-critical JavaScript.",
-      selector: null,
-      wcag: null,
-      impact: null,
-      source: null,
-      url: pageUrl,
-    });
-  }
-
-  for (const resource of jsResources) {
-    if (resource.size > MAX_SINGLE_JS_BYTES) {
-      findings.push({
-        id: "bundle-large-javascript-chunk",
-        category: "bundle",
-        severity: "minor",
-        effort: "medium",
-        rule_id: "bundle/large-javascript-chunk",
-        title: "Single JavaScript resource exceeds 200 KB",
-        description: `${resource.url} is ${formatKb(resource.size)}.`,
-        recommendation: "Split this bundle into smaller chunks or lazy-load non-critical parts.",
-        selector: null,
-        wcag: null,
-        impact: null,
-        source: null,
-        url: pageUrl,
-      });
-    }
-  }
-
-  if (totalCss > MAX_TOTAL_CSS_BYTES) {
-    findings.push({
-      id: "bundle-total-css-size",
-      category: "bundle",
-      severity: "minor",
-      effort: "medium",
-      rule_id: "bundle/total-css-size",
-      title: "Total CSS transfer size exceeds 100 KB",
-      description: `Total CSS transferred is ${formatKb(totalCss)}, which exceeds the 100 KB threshold.`,
-      recommendation:
-        "Remove unused CSS, split critical from non-critical styles, and load non-critical CSS asynchronously.",
-      selector: null,
-      wcag: null,
-      impact: null,
-      source: null,
-      url: pageUrl,
-    });
-  }
-
-  for (const resourceUrl of httpResources) {
-    findings.push({
-      id: "bundle-insecure-resource",
-      category: "bundle",
-      severity: "critical",
-      effort: "low",
-      rule_id: "bundle/insecure-resource",
-      title: "Resource loaded over insecure HTTP",
-      description: `${resourceUrl} is loaded over HTTP instead of HTTPS.`,
-      recommendation: "Update the resource URL to use HTTPS.",
-      selector: null,
-      wcag: null,
-      impact: null,
-      source: null,
-      url: pageUrl,
-    });
-  }
 
   return {
     findings,
@@ -147,5 +216,5 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
   };
 }
 
-export { runBundleChecks };
-export type { BundleRunnerResult };
+export { runBundleChecks, buildBundleFindings, sanitizeResourceUrl };
+export type { BundleRunnerResult, ResourceInfo };
