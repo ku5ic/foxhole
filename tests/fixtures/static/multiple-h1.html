@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Multiple H1 Fixture</title>
+  </head>
+  <body>
+    <!--
+      Two <h1> elements on this page trigger the semantic multiple-h1 check.
+      This fixture must be separate from spa.html because spa.html has no <h1>
+      (to trigger missing-h1), and both checks cannot fire on the same page.
+    -->
+    <h1>Primary heading</h1>
+    <h1>Duplicate heading</h1>
+  </body>
+</html>

@@ -1,6 +1,8 @@
 import type { Page } from "playwright";
 
+import { catalog } from "../catalog/index.js";
 import { RunnerError } from "../errors.js";
+import { buildSemanticPath, buildTextFingerprint, computeFindingId } from "./finding-id.js";
 import type { Finding } from "../types/index.js";
 
 interface SemanticRunnerResult {
@@ -9,7 +11,7 @@ interface SemanticRunnerResult {
 
 interface SemanticCheckResult {
   check: string;
-  issues: { selector: string | null; detail: string }[];
+  issues: { selector: string | null; detail: string; outerHTML: string | null }[];
 }
 
 const SEMANTIC_CHECKS_SCRIPT = `(() => {
@@ -17,13 +19,14 @@ const SEMANTIC_CHECKS_SCRIPT = `(() => {
 
   const h1s = document.querySelectorAll("h1");
   if (h1s.length === 0) {
-    checks.push({ check: "missing-h1", issues: [{ selector: null, detail: "Page has no h1 element" }] });
+    checks.push({ check: "missing-h1", issues: [{ selector: null, detail: "Page has no h1 element", outerHTML: null }] });
   } else if (h1s.length > 1) {
     checks.push({
       check: "multiple-h1",
       issues: Array.from(h1s).slice(1).map(el => ({
         selector: el.tagName.toLowerCase(),
-        detail: "Page has " + h1s.length + " h1 elements"
+        detail: "Page has " + h1s.length + " h1 elements",
+        outerHTML: el.outerHTML.slice(0, 500)
       }))
     });
   }
@@ -35,7 +38,7 @@ const SEMANTIC_CHECKS_SCRIPT = `(() => {
     if (prevLevel > 0 && level > prevLevel + 1) {
       checks.push({
         check: "skipped-heading-level",
-        issues: [{ selector: heading.tagName.toLowerCase(), detail: "Heading level skipped from h" + prevLevel + " to h" + level }]
+        issues: [{ selector: heading.tagName.toLowerCase(), detail: "Heading level skipped from h" + prevLevel + " to h" + level, outerHTML: heading.outerHTML.slice(0, 500) }]
       });
     }
     prevLevel = level;
@@ -46,7 +49,7 @@ const SEMANTIC_CHECKS_SCRIPT = `(() => {
   for (const el of interactives) {
     const text = (el.textContent || "").trim() || el.getAttribute("aria-label") || el.getAttribute("title") || "";
     if (text === "") {
-      noText.push({ selector: el.tagName.toLowerCase(), detail: el.tagName.toLowerCase() + " has no accessible text" });
+      noText.push({ selector: el.tagName.toLowerCase(), detail: el.tagName.toLowerCase() + " has no accessible text", outerHTML: el.outerHTML.slice(0, 500) });
     }
   }
   if (noText.length > 0) checks.push({ check: "interactive-no-text", issues: noText });
@@ -61,7 +64,7 @@ const SEMANTIC_CHECKS_SCRIPT = `(() => {
     const hasAriaLabelledBy = input.getAttribute("aria-labelledby") !== null;
     const wrappedInLabel = input.closest("label") !== null;
     if (!hasLabel && !hasAriaLabel && !hasAriaLabelledBy && !wrappedInLabel) {
-      unlabeled.push({ selector: input.tagName.toLowerCase(), detail: "Form input has no associated label" });
+      unlabeled.push({ selector: input.tagName.toLowerCase(), detail: "Form input has no associated label", outerHTML: input.outerHTML.slice(0, 500) });
     }
   }
   if (unlabeled.length > 0) checks.push({ check: "input-no-label", issues: unlabeled });
@@ -70,7 +73,7 @@ const SEMANTIC_CHECKS_SCRIPT = `(() => {
   const noAlt = [];
   for (const img of images) {
     if (!img.hasAttribute("alt")) {
-      noAlt.push({ selector: "img", detail: "Image has no alt attribute" });
+      noAlt.push({ selector: "img", detail: "Image has no alt attribute", outerHTML: img.outerHTML.slice(0, 500) });
     }
   }
   if (noAlt.length > 0) checks.push({ check: "img-no-alt", issues: noAlt });
@@ -79,13 +82,44 @@ const SEMANTIC_CHECKS_SCRIPT = `(() => {
   const noKeyboard = [];
   for (const el of fakeButtons) {
     if (!el.hasAttribute("tabindex")) {
-      noKeyboard.push({ selector: el.tagName.toLowerCase() + '[role="button"]', detail: "Element with role=button has no tabindex for keyboard access" });
+      noKeyboard.push({ selector: el.tagName.toLowerCase() + '[role="button"]', detail: "Element with role=button has no tabindex for keyboard access", outerHTML: el.outerHTML.slice(0, 500) });
     }
   }
   if (noKeyboard.length > 0) checks.push({ check: "fake-button-no-keyboard", issues: noKeyboard });
 
   return checks;
 })()`;
+
+function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: string): Finding[] {
+  const ruleId = `semantic/${result.check}`;
+  const entry = catalog[ruleId];
+
+  if (!entry && process.env.FOXHOLE_DEBUG === "1") {
+    process.stderr.write(`[foxhole:debug] catalog gap: ruleId=${ruleId}\n`);
+  }
+
+  return result.issues.map((issue) => {
+    const semanticPath = issue.outerHTML === null ? "" : buildSemanticPath(issue.outerHTML);
+    const textFingerprint = buildTextFingerprint({ ruleId: result.check, detail: issue.detail });
+    const id = computeFindingId({ pageUrl, ruleId, semanticPath, textFingerprint });
+
+    return {
+      id,
+      category: "semantic" as const,
+      severity: entry ? entry.default_severity : ("minor" as const),
+      effort: entry ? entry.default_effort : ("low" as const),
+      rule_id: ruleId,
+      title: entry ? entry.title_template : result.check,
+      description: issue.detail,
+      recommendation: entry ? entry.recommendation : "Review and fix the semantic issue.",
+      selector: issue.selector,
+      wcag: null,
+      impact: null,
+      source: null,
+      url: pageUrl,
+    };
+  });
+}
 
 async function runSemanticChecks(page: Page, pageUrl: string): Promise<SemanticRunnerResult> {
   try {
@@ -100,95 +134,5 @@ async function runSemanticChecks(page: Page, pageUrl: string): Promise<SemanticR
   }
 }
 
-function severityForCheck(check: string): "critical" | "major" | "minor" {
-  switch (check) {
-    case "missing-h1":
-    case "input-no-label":
-    case "interactive-no-text":
-    case "img-no-alt": {
-      return "major";
-    }
-    default: {
-      return "minor";
-    }
-  }
-}
-
-function titleForCheck(check: string): string {
-  switch (check) {
-    case "missing-h1": {
-      return "Missing h1 element";
-    }
-    case "multiple-h1": {
-      return "Multiple h1 elements";
-    }
-    case "skipped-heading-level": {
-      return "Skipped heading level";
-    }
-    case "interactive-no-text": {
-      return "Interactive element without accessible text";
-    }
-    case "input-no-label": {
-      return "Form input without associated label";
-    }
-    case "img-no-alt": {
-      return "Image missing alt attribute";
-    }
-    case "fake-button-no-keyboard": {
-      return "Custom button missing keyboard access";
-    }
-    default: {
-      return check;
-    }
-  }
-}
-
-function recommendationForCheck(check: string): string {
-  switch (check) {
-    case "missing-h1": {
-      return "Add a single h1 element that describes the page content.";
-    }
-    case "multiple-h1": {
-      return "Use a single h1 per page. Demote extra h1 elements to h2 or lower.";
-    }
-    case "skipped-heading-level": {
-      return "Use heading levels in sequential order without skipping levels.";
-    }
-    case "interactive-no-text": {
-      return "Add visible text, an aria-label, or a title attribute to the element.";
-    }
-    case "input-no-label": {
-      return "Associate a label element with each form input using the for attribute.";
-    }
-    case "img-no-alt": {
-      return 'Add a descriptive alt attribute to the image, or alt="" if decorative.';
-    }
-    case "fake-button-no-keyboard": {
-      return 'Add tabindex="0" and keyboard event handlers to custom button elements.';
-    }
-    default: {
-      return "Review and fix the semantic issue.";
-    }
-  }
-}
-
-function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: string): Finding[] {
-  return result.issues.map((issue) => ({
-    id: `semantic-${result.check}`,
-    category: "semantic" as const,
-    severity: severityForCheck(result.check),
-    effort: "low" as const,
-    rule_id: `semantic/${result.check}`,
-    title: titleForCheck(result.check),
-    description: issue.detail,
-    recommendation: recommendationForCheck(result.check),
-    selector: issue.selector,
-    wcag: null,
-    impact: null,
-    source: null,
-    url: pageUrl,
-  }));
-}
-
-export { runSemanticChecks };
-export type { SemanticRunnerResult };
+export { runSemanticChecks, mapSemanticResultToFindings };
+export type { SemanticRunnerResult, SemanticCheckResult };

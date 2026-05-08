@@ -1,16 +1,28 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <!-- intentionally missing <title> to trigger document-title violation -->
+    <!-- intentionally missing <title> to trigger axe document-title violation -->
   </head>
   <body>
-    <!-- intentionally missing alt to trigger image-alt violation -->
-    <img src="hero.png" class="hero-banner" />
-    <!-- intentionally missing label to trigger label violation -->
+    <!-- no <h1> -> triggers semantic missing-h1 -->
+
+    <!-- h2 then h4, skipping h3 -> triggers semantic skipped-heading-level -->
+    <h2>Section</h2>
+    <h4>Subsection</h4>
+
+    <!-- button with no text -> triggers semantic interactive-no-text -->
+    <button></button>
+
+    <!-- input without label -> triggers semantic input-no-label -->
     <form>
-      <input type="email" id="email" />
+      <input type="email" />
     </form>
-    <!-- custom unknown rule would not be triggered by real axe, used only in unit tests -->
+
+    <!-- img without alt -> triggers semantic img-no-alt and axe image-alt -->
+    <img src="hero.png" class="hero-banner" />
+
+    <!-- div role=button without tabindex -> triggers semantic fake-button-no-keyboard -->
+    <div role="button">Click me</div>
   </body>
 </html>
