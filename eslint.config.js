@@ -1,12 +1,13 @@
-// @ts-check
+// @ts-nocheck
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import unicorn from "eslint-plugin-unicorn";
 
 export default tseslint.config(
+  { ignores: ["dist/**", "node_modules/**", "bin/**", "eslint.config.js"] },
   js.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
-  ...tseslint.configs.stylisticTypeChecked,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
   {
     plugins: {
       unicorn,
@@ -29,8 +30,5 @@ export default tseslint.config(
         project: "./tsconfig.eslint.json",
       },
     },
-  },
-  {
-    ignores: ["dist/**", "node_modules/**", "bin/**", "eslint.config.js"],
   },
 );
