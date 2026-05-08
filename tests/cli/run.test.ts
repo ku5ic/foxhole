@@ -24,13 +24,19 @@ function makeReport(passed = true): AuditReport {
     meta: {
       foxhole_version: "test",
       node_version: "test",
-      platform: "test",
+      platform: "test-arm64",
+      audited_at: "2026-04-07T00:00:00.000Z",
       input_mode: "url",
       checks_run: [],
-      crawl_depth: 0,
+      page_count: 0,
       duration_ms: 0,
       threshold: null,
       passed,
+      concurrency: 1,
+      perf_runs: 1,
+      perf_profile: "standard",
+      source_maps: "auto",
+      dependencies: { axe_core: "0.0.0", lighthouse: "0.0.0", playwright: "0.0.0" },
     },
   };
 }

@@ -28,6 +28,15 @@ function summarizeReport(pages: PageResult[], score: number): string {
     parts.push("This build passes the configured threshold.");
   }
 
+  const erroredCount = pages
+    .flatMap((p) => p.categories)
+    .filter((c) => c.status === "errored").length;
+  if (erroredCount > 0) {
+    parts.push(
+      `${String(erroredCount)} check runner ${erroredCount === 1 ? "error" : "errors"} occurred.`,
+    );
+  }
+
   return parts.join(" ");
 }
 

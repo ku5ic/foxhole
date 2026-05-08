@@ -6,14 +6,13 @@ This document is the canonical roadmap for Foxhole v1.0.0. It describes what eac
 
 ## Current state
 
-The project scaffold is complete. All 25 tests pass. TypeScript, ESLint, and Prettier are configured. The canonical types, config layer, CLI commands, runner stubs, audit layer, MCP server, and initial tests are in place. The codebase builds and the CLI prints help without errors.
+Phase 0 and Phase 1 are complete. 205 tests pass. All four runners produce schema-valid `Finding[]` with stable IDs. The catalog drives titles, severities, and effort estimates. The audit layer scores, prioritizes, and diffs correctly.
 
-Known gaps carried into Phase 0:
+Open items carried into Phase 2:
 
-- `--build` flag is not wired to `serveStaticBuild` in the run command
-- Error handling is inconsistent across the runner layer (runners throw raw errors rather than typed `RunnerError`)
-- Lighthouse + Playwright unification (closed by docs/spec/architecture.md section 13.4; verify in Phase 1)
-- axe effort estimation defaults to "medium" (must be resolved before v1.0.0; catalog-driven per docs/spec/architecture.md section 5.3)
+- `Finding.source` is always null; source map integration is deferred (see Phase 1 Deferred)
+- Lighthouse and Playwright open separate Chromium instances (see Phase 1 Deferred)
+- `--build` mode exists but has not been tested end-to-end with the Phase 1 runners
 
 ---
 
@@ -43,29 +42,28 @@ Known gaps carried into Phase 0:
 
 ---
 
-## Phase 1: Core runners
+## Phase 1: Schema sync, catalog, and core runners
 
 **Spec:** `docs/phases/phase-1.md`
-**Status:** Planned
+**Status:** Complete
 
-### Objectives
+### Delivered
 
-- Implement `runner/axe.ts` to produce real `Finding[]` from a live page
-- Implement `runner/lighthouse.ts` to produce real `PerformanceMetrics` and `Finding[]`
-- Implement `runner/semantic.ts` with all six DOM checks
-- Implement `runner/bundle.ts` with network interception and size thresholds
-- Validate runner output shape against the canonical `Finding` type
-- Enforce the `PageResult.categories` length-4 invariant in `audit/score.ts`: non-requested checks present as `status: "skipped"` entries per docs/spec/schemas.md section 1.7 (carried over from Phase 0)
+- Zod runtime schema in `src/types/schema.ts`; all TypeScript types derived via `z.infer`
+- Findings catalog in `src/catalog/` with 48 entries covering axe-core, Lighthouse, semantic, and bundle rules
+- `src/runner/finding-id.ts`: stable 16-hex-char finding IDs via sha256 of page URL, rule ID, semantic path, and text fingerprint
+- All four runners produce `Finding[]` validated against the `Finding` type with catalog-backed titles, severities, and effort estimates
+- `audit/score.ts` enforces the length-4 categories invariant: every `PageResult.categories` has exactly 4 entries (ok, errored, or skipped)
+- Per-runner error isolation: a failed runner produces an errored `CategorySummary`; the page remains `ok`
+- `audit/prioritize.ts` groups fixes by `rule_id` with catalog titles and stable sort
+- `audit/diff.ts` computes `comparable` from `perf_profile` and dependency major-version changes
+- `RunMeta.dependencies` populated from installed package versions at runtime
 
-### Success criteria
+### Deferred from Phase 1
 
-- `foxhole run --url https://example.com --checks a11y --output json` produces valid JSON with at least one finding or an empty findings array (no crash)
-- `foxhole run --url https://example.com --checks perf --output json` produces valid JSON with populated `metrics` fields
-- All four runners produce `Finding[]` that validate against the `Finding` type
-- Finding IDs are stable 16-hex-char hashes computed per docs/spec/schemas.md section 2
-- Severity mapping matches the finding-normalization skill exactly
-- When a runner throws, the resulting `CategorySummary` for that category has `status: "errored"` with the error message captured per docs/spec/architecture.md section 6.3 and docs/spec/schemas.md section 1.5
-- On every `PageResult` (ok or errored), `categories` has exactly 4 entries: ok categories have `status: "ok"`, errored categories have `status: "errored"`, non-requested categories have `status: "skipped"`
+- **`Finding.source` (source map integration):** All runners set `source: null`. Resolving bundle coordinates to original source locations via source maps is deferred to Phase 3 or later. Tracked in architecture spec 13.3.
+- **Lighthouse + Playwright Chrome unification:** Lighthouse opens a separate Chromium instance from the Playwright page. Sharing the instance requires a Lighthouse custom connection adapter. Deferred; logged in `src/runner/lighthouse.ts`. Tracked in architecture spec 13.4.
+- **CLI flag wiring for `--checks` filtering:** `checks_run` is passed through but not yet validated against the config schema at the CLI layer. Deferred to Phase 4 when multi-URL and `--build` plumbing is finalized.
 
 ### Relevant decisions
 

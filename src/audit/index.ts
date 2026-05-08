@@ -15,12 +15,26 @@ interface BuildAuditOptions {
   threshold?: number | undefined;
 }
 
+function readPackageJsonVersion(packageJsonPath: string): string {
+  try {
+    const raw = fs.readFileSync(packageJsonPath, "utf8");
+    const parsed = JSON.parse(raw) as { version: string };
+    return parsed.version;
+  } catch {
+    return "unknown";
+  }
+}
+
 function readVersion(): string {
-  const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-  const packageJsonPath = path.resolve(__dirname, "..", "..", "package.json");
-  const raw = fs.readFileSync(packageJsonPath, "utf8");
-  const parsed = JSON.parse(raw) as { version: string };
-  return parsed.version;
+  const dir = path.dirname(url.fileURLToPath(import.meta.url));
+  return readPackageJsonVersion(path.resolve(dir, "..", "..", "package.json"));
+}
+
+function readDependencyVersion(name: string): string {
+  const dir = path.dirname(url.fileURLToPath(import.meta.url));
+  return readPackageJsonVersion(
+    path.resolve(dir, "..", "..", "node_modules", name, "package.json"),
+  );
 }
 
 function determineInputMode(urls: string[]): "url" | "urls" | "build" {
@@ -37,7 +51,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
     quiet: options.quiet,
   });
 
-  const scoredPages = rawPages.map((page) => scorePage(page));
+  const scoredPages = rawPages.map((page) => scorePage(page, options.checks));
   const overallScore = scoreReport(scoredPages);
 
   const allFindings = scoredPages.flatMap((page) => page.findings);
@@ -56,13 +70,23 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
     meta: {
       foxhole_version: readVersion(),
       node_version: process.version,
-      platform: process.platform,
+      platform: `${process.platform}-${process.arch}`,
+      audited_at: new Date(startTime).toISOString(),
       input_mode: determineInputMode(options.urls),
       checks_run: options.checks,
-      crawl_depth: 0,
+      page_count: options.urls.length,
       duration_ms: durationMs,
       threshold: options.threshold ?? null,
       passed,
+      concurrency: 1,
+      perf_runs: 1,
+      perf_profile: "standard",
+      source_maps: "auto",
+      dependencies: {
+        axe_core: readDependencyVersion("axe-core"),
+        lighthouse: readDependencyVersion("lighthouse"),
+        playwright: readDependencyVersion("playwright"),
+      },
     },
   };
 }

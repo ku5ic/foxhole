@@ -14,12 +14,14 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     category: "a11y",
     severity: "minor",
     effort: "low",
+    rule_id: "a11y/test",
     title: "Test finding",
     description: "A test finding.",
     recommendation: "Fix it.",
     selector: null,
     wcag: null,
     impact: null,
+    source: null,
     url: "https://example.com",
     ...overrides,
   };
@@ -49,6 +51,7 @@ function basePage(overrides: Partial<PageResult> = {}): PageResult {
     findings: [],
     metrics: emptyMetrics(),
     audited_at: "2026-04-07T00:00:00.000Z",
+    duration_ms: 0,
     ...overrides,
   };
 }
@@ -63,13 +66,19 @@ function makeReport(overrides: Partial<AuditReport> = {}): AuditReport {
     meta: {
       foxhole_version: "0.1.0",
       node_version: "v20.11.0",
-      platform: "darwin",
+      platform: "darwin-arm64",
+      audited_at: "2026-04-07T00:00:00.000Z",
       input_mode: "url",
       checks_run: ["a11y"],
-      crawl_depth: 0,
+      page_count: 1,
       duration_ms: 1000,
       threshold: null,
       passed: true,
+      concurrency: 1,
+      perf_runs: 1,
+      perf_profile: "standard",
+      source_maps: "auto",
+      dependencies: { axe_core: "0.0.0", lighthouse: "0.0.0", playwright: "0.0.0" },
     },
     ...overrides,
   };
@@ -147,5 +156,82 @@ describe("diffReports", () => {
     const diff = diffReports(before, after);
     expect(diff.summary.length).toBeGreaterThan(0);
     expect(diff.summary).toContain("+15");
+  });
+
+  it("is comparable when perf_profile and dependency major versions match", () => {
+    const before = makeReport();
+    const after = makeReport();
+    const diff = diffReports(before, after);
+    expect(diff.comparable).toBe(true);
+    expect(diff.comparability_notes).toHaveLength(0);
+  });
+
+  it("is not comparable when perf_profile differs", () => {
+    const before = makeReport();
+    const after = makeReport({ meta: { ...makeReport().meta, perf_profile: "mobile" } });
+    const diff = diffReports(before, after);
+    expect(diff.comparable).toBe(false);
+    expect(diff.comparability_notes).toHaveLength(1);
+    expect(diff.comparability_notes[0]).toContain("standard");
+    expect(diff.comparability_notes[0]).toContain("mobile");
+  });
+
+  it("is not comparable when a dependency major version changes", () => {
+    const before = makeReport({
+      meta: {
+        ...makeReport().meta,
+        dependencies: { axe_core: "4.7.0", lighthouse: "10.0.0", playwright: "1.40.0" },
+      },
+    });
+    const after = makeReport({
+      meta: {
+        ...makeReport().meta,
+        dependencies: { axe_core: "5.0.0", lighthouse: "10.0.0", playwright: "1.40.0" },
+      },
+    });
+    const diff = diffReports(before, after);
+    expect(diff.comparable).toBe(false);
+    expect(diff.comparability_notes).toHaveLength(1);
+    expect(diff.comparability_notes[0]).toContain("axe_core");
+    expect(diff.comparability_notes[0]).toContain("4");
+    expect(diff.comparability_notes[0]).toContain("5");
+  });
+
+  it("accumulates multiple comparability notes", () => {
+    const before = makeReport({
+      meta: {
+        ...makeReport().meta,
+        perf_profile: "fast",
+        dependencies: { axe_core: "4.7.0", lighthouse: "10.0.0", playwright: "1.40.0" },
+      },
+    });
+    const after = makeReport({
+      meta: {
+        ...makeReport().meta,
+        perf_profile: "mobile",
+        dependencies: { axe_core: "5.0.0", lighthouse: "10.0.0", playwright: "1.40.0" },
+      },
+    });
+    const diff = diffReports(before, after);
+    expect(diff.comparable).toBe(false);
+    expect(diff.comparability_notes.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("remains comparable when only patch versions differ", () => {
+    const before = makeReport({
+      meta: {
+        ...makeReport().meta,
+        dependencies: { axe_core: "4.7.0", lighthouse: "10.0.1", playwright: "1.40.0" },
+      },
+    });
+    const after = makeReport({
+      meta: {
+        ...makeReport().meta,
+        dependencies: { axe_core: "4.8.0", lighthouse: "10.1.0", playwright: "1.41.0" },
+      },
+    });
+    const diff = diffReports(before, after);
+    expect(diff.comparable).toBe(true);
+    expect(diff.comparability_notes).toHaveLength(0);
   });
 });

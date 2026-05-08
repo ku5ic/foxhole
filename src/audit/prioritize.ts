@@ -1,4 +1,5 @@
-import type { CheckCategory, Finding, Fix, Severity } from "../types/index.js";
+import { catalog } from "../catalog/index.js";
+import type { Finding, Fix, Severity } from "../types/index.js";
 
 const SEVERITY_RANK: Record<Severity, number> = {
   critical: 1,
@@ -6,31 +7,15 @@ const SEVERITY_RANK: Record<Severity, number> = {
   minor: 3,
 };
 
-function groupKey(finding: Finding): string {
-  return `${finding.category}:${finding.severity}`;
-}
-
-function titleForGroup(category: CheckCategory, severity: Severity, count: number): string {
-  const categoryLabel: Record<CheckCategory, string> = {
-    perf: "performance",
-    a11y: "accessibility",
-    semantic: "semantic HTML",
-    bundle: "bundle",
-  };
-
-  return `Fix ${String(count)} ${severity} ${categoryLabel[category]} ${count === 1 ? "issue" : "issues"}`;
-}
-
 function prioritizeFindings(findings: Finding[]): Fix[] {
   const groups = new Map<string, Finding[]>();
 
   for (const finding of findings) {
-    const key = groupKey(finding);
-    const existing = groups.get(key);
+    const existing = groups.get(finding.rule_id);
     if (existing) {
       existing.push(finding);
     } else {
-      groups.set(key, [finding]);
+      groups.set(finding.rule_id, [finding]);
     }
   }
 
@@ -40,20 +25,29 @@ function prioritizeFindings(findings: Finding[]): Fix[] {
     const first = groupFindings[0];
     if (!first) continue;
 
+    const count = groupFindings.length;
+    const entry = catalog[first.rule_id];
+    const categoryLabel = first.category === "a11y" ? "accessibility" : first.category;
+
     fixes.push({
       rank: SEVERITY_RANK[first.severity],
       finding_ids: groupFindings.map((f) => f.id),
-      title: titleForGroup(first.category, first.severity, groupFindings.length),
-      description: `${String(groupFindings.length)} ${first.severity} ${first.category === "a11y" ? "accessibility" : first.category} finding${groupFindings.length === 1 ? "" : "s"} that should be addressed.`,
+      rule_id: first.rule_id,
+      title: entry?.title_template ?? first.title,
+      description: `${String(count)} ${first.severity} ${categoryLabel} ${count === 1 ? "finding" : "findings"} that should be addressed.`,
       effort: first.effort,
       severity: first.severity,
       category: first.category,
+      pages_affected: [...new Set(groupFindings.map((f) => f.url))],
     });
   }
 
   fixes.sort((a, b) => {
     if (a.rank !== b.rank) return a.rank - b.rank;
-    return b.finding_ids.length - a.finding_ids.length;
+    if (b.finding_ids.length !== a.finding_ids.length) {
+      return b.finding_ids.length - a.finding_ids.length;
+    }
+    return a.rule_id.localeCompare(b.rule_id);
   });
 
   let rank = 1;

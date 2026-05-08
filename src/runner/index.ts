@@ -51,7 +51,12 @@ function buildErroredCategorySummary(category: CheckCategory, message: string): 
   };
 }
 
-function buildErroredPageResult(url: string, checks: CheckCategory[], message: string): PageResult {
+function buildErroredPageResult(
+  url: string,
+  checks: CheckCategory[],
+  message: string,
+  duration_ms: number,
+): PageResult {
   return {
     url,
     status: "errored",
@@ -61,13 +66,19 @@ function buildErroredPageResult(url: string, checks: CheckCategory[], message: s
     findings: [],
     metrics: emptyMetrics(),
     audited_at: new Date().toISOString(),
+    duration_ms,
   };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
 }
 
 async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
   const results: PageResult[] = [];
 
   for (const url of options.urls) {
+    const pageStartTime = Date.now();
     log(`Auditing ${url}`, options.quiet);
 
     try {
@@ -76,8 +87,8 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
         const page = await createPage(browser);
         let metrics = emptyMetrics();
         const findings: Finding[] = [];
+        const erroredCategories: CategorySummary[] = [];
 
-        // Navigate for non-bundle checks (bundle runner does its own navigation)
         const needsNavigation = options.checks.some((c) => c !== "bundle");
         if (needsNavigation) {
           try {
@@ -90,30 +101,46 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
 
         if (options.checks.includes("a11y")) {
           log("Running accessibility checks", options.quiet);
-          const axeResult = await runAxe(page, url);
-          findings.push(...axeResult.findings);
+          try {
+            const axeResult = await runAxe(page, url);
+            findings.push(...axeResult.findings);
+          } catch (error) {
+            erroredCategories.push(buildErroredCategorySummary("a11y", errorMessage(error)));
+          }
         }
 
         if (options.checks.includes("perf")) {
           log("Running performance checks", options.quiet);
-          const lighthouseResult = await runLighthouse(url);
-          metrics = { ...metrics, ...lighthouseResult.metrics };
-          findings.push(...lighthouseResult.findings);
+          try {
+            const lighthouseResult = await runLighthouse(url);
+            metrics = { ...metrics, ...lighthouseResult.metrics };
+            findings.push(...lighthouseResult.findings);
+          } catch (error) {
+            erroredCategories.push(buildErroredCategorySummary("perf", errorMessage(error)));
+          }
         }
 
         if (options.checks.includes("semantic")) {
           log("Running semantic checks", options.quiet);
-          const semanticResult = await runSemanticChecks(page, url);
-          findings.push(...semanticResult.findings);
+          try {
+            const semanticResult = await runSemanticChecks(page, url);
+            findings.push(...semanticResult.findings);
+          } catch (error) {
+            erroredCategories.push(buildErroredCategorySummary("semantic", errorMessage(error)));
+          }
         }
 
         if (options.checks.includes("bundle")) {
           log("Running bundle checks", options.quiet);
-          const bundlePage = await createPage(browser);
-          const bundleResult = await runBundleChecks(bundlePage, url);
-          findings.push(...bundleResult.findings);
-          metrics = { ...metrics, bundle_size: bundleResult.bundle_size };
-          await bundlePage.close();
+          try {
+            const bundlePage = await createPage(browser);
+            const bundleResult = await runBundleChecks(bundlePage, url);
+            findings.push(...bundleResult.findings);
+            metrics = { ...metrics, bundle_size: bundleResult.bundle_size };
+            await bundlePage.close();
+          } catch (error) {
+            erroredCategories.push(buildErroredCategorySummary("bundle", errorMessage(error)));
+          }
         }
 
         results.push({
@@ -121,10 +148,11 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
           status: "ok",
           error: null,
           score: 0,
-          categories: [],
+          categories: erroredCategories,
           findings,
           metrics,
           audited_at: new Date().toISOString(),
+          duration_ms: Date.now() - pageStartTime,
         });
       } finally {
         await browser.close();
@@ -133,7 +161,9 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
       if (!(error instanceof RunnerError)) throw error;
       // Failure logs always emit, regardless of options.quiet.
       process.stderr.write(`[foxhole] failed ${url}: ${error.message}\n`);
-      results.push(buildErroredPageResult(url, options.checks, error.message));
+      results.push(
+        buildErroredPageResult(url, options.checks, error.message, Date.now() - pageStartTime),
+      );
     }
   }
 
