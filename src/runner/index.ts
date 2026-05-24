@@ -1,4 +1,4 @@
-import { RunnerError } from "../errors.js";
+import { RunnerError, formatErrorChain } from "../errors.js";
 import { createBrowser, createPage, waitForPageReady } from "./browser.js";
 import { runAxe } from "./axe.js";
 import { runLighthouse } from "./lighthouse.js";
@@ -70,10 +70,6 @@ function buildErroredPageResult(
   };
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unknown error";
-}
-
 async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
   const results: PageResult[] = [];
 
@@ -105,7 +101,9 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
             const axeResult = await runAxe(page, url);
             findings.push(...axeResult.findings);
           } catch (error) {
-            erroredCategories.push(buildErroredCategorySummary("a11y", errorMessage(error)));
+            const msg = formatErrorChain(error);
+            log(`a11y runner failed: ${msg}`, options.quiet);
+            erroredCategories.push(buildErroredCategorySummary("a11y", msg));
           }
         }
 
@@ -116,7 +114,9 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
             metrics = { ...metrics, ...lighthouseResult.metrics };
             findings.push(...lighthouseResult.findings);
           } catch (error) {
-            erroredCategories.push(buildErroredCategorySummary("perf", errorMessage(error)));
+            const msg = formatErrorChain(error);
+            log(`perf runner failed: ${msg}`, options.quiet);
+            erroredCategories.push(buildErroredCategorySummary("perf", msg));
           }
         }
 
@@ -126,7 +126,9 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
             const semanticResult = await runSemanticChecks(page, url);
             findings.push(...semanticResult.findings);
           } catch (error) {
-            erroredCategories.push(buildErroredCategorySummary("semantic", errorMessage(error)));
+            const msg = formatErrorChain(error);
+            log(`semantic runner failed: ${msg}`, options.quiet);
+            erroredCategories.push(buildErroredCategorySummary("semantic", msg));
           }
         }
 
@@ -139,7 +141,9 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
             metrics = { ...metrics, bundle_size: bundleResult.bundle_size };
             await bundlePage.close();
           } catch (error) {
-            erroredCategories.push(buildErroredCategorySummary("bundle", errorMessage(error)));
+            const msg = formatErrorChain(error);
+            log(`bundle runner failed: ${msg}`, options.quiet);
+            erroredCategories.push(buildErroredCategorySummary("bundle", msg));
           }
         }
 
@@ -159,11 +163,10 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
       }
     } catch (error) {
       if (!(error instanceof RunnerError)) throw error;
-      // Failure logs always emit, regardless of options.quiet.
-      process.stderr.write(`[foxhole] failed ${url}: ${error.message}\n`);
-      results.push(
-        buildErroredPageResult(url, options.checks, error.message, Date.now() - pageStartTime),
-      );
+      const msg = formatErrorChain(error);
+      // Navigation failures always emit regardless of quiet.
+      process.stderr.write(`[foxhole] failed ${url}: ${msg}\n`);
+      results.push(buildErroredPageResult(url, options.checks, msg, Date.now() - pageStartTime));
     }
   }
 
