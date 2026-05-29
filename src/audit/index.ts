@@ -49,6 +49,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
     urls: options.urls,
     checks: options.checks,
     quiet: options.quiet,
+    throttling: "none", // replaced by user-controlled value in the wiring commit
   });
 
   const scoredPages = rawPages.map((page) => scorePage(page, options.checks));

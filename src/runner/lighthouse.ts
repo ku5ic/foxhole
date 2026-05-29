@@ -6,6 +6,9 @@ import { RunnerError } from "../errors.js";
 import { buildTextFingerprint, computeFindingId } from "./finding-id.js";
 import type { Finding, PerformanceMetrics, Severity } from "../types/index.js";
 
+// Throttling preset names that callers use. The mapping to Lighthouse settings lives here.
+type ThrottlingPreset = "desktop" | "mobile" | "none";
+
 interface LighthouseRunnerResult {
   metrics: PerformanceMetrics;
   findings: Finding[];
@@ -24,6 +27,89 @@ interface LighthouseAudit {
 interface LighthouseCategory {
   score: number | null;
   auditRefs: { id: string }[];
+}
+
+// Throttling values sourced from lighthouse/core/config/constants.js at lighthouse@13.1.0.
+// desktopDense4G: 40ms RTT, 10 Mbps, 1x CPU -- desktop conditions, light simulation.
+const DESKTOP_THROTTLING = {
+  rttMs: 40,
+  throughputKbps: 10_240,
+  cpuSlowdownMultiplier: 1,
+  requestLatencyMs: 0,
+  downloadThroughputKbps: 0,
+  uploadThroughputKbps: 0,
+};
+// mobileSlow4G: 150ms RTT, 1.6 Mbps, 4x CPU -- matches PageSpeed Insights default.
+const MOBILE_THROTTLING = {
+  rttMs: 150,
+  throughputKbps: 1638.4,
+  requestLatencyMs: 562.5,
+  downloadThroughputKbps: 1474.56,
+  uploadThroughputKbps: 675,
+  cpuSlowdownMultiplier: 4,
+};
+// "provided" preset passes zero throttling; the runner reports observed conditions as-is.
+const NO_THROTTLING = {
+  rttMs: 0,
+  throughputKbps: 0,
+  cpuSlowdownMultiplier: 1,
+  requestLatencyMs: 0,
+  downloadThroughputKbps: 0,
+  uploadThroughputKbps: 0,
+};
+
+// Screen emulation values from lighthouse/core/config/constants.js screenEmulationMetrics.
+const DESKTOP_SCREEN = {
+  mobile: false,
+  width: 1350,
+  height: 940,
+  deviceScaleFactor: 1,
+  disabled: false,
+};
+const MOBILE_SCREEN = {
+  mobile: true,
+  width: 412,
+  height: 823,
+  deviceScaleFactor: 1.75,
+  disabled: false,
+};
+
+interface LighthousePresetSettings {
+  formFactor: "desktop" | "mobile";
+  throttlingMethod: "simulate" | "provided";
+  throttling: typeof DESKTOP_THROTTLING;
+  screenEmulation: typeof DESKTOP_SCREEN | typeof MOBILE_SCREEN;
+}
+
+// Maps a ThrottlingPreset to the Lighthouse flags fields that control form factor and throttling.
+function buildLighthouseConfig(preset: ThrottlingPreset): LighthousePresetSettings {
+  switch (preset) {
+    case "desktop": {
+      return {
+        formFactor: "desktop",
+        throttlingMethod: "simulate",
+        throttling: DESKTOP_THROTTLING,
+        screenEmulation: DESKTOP_SCREEN,
+      };
+    }
+    case "mobile": {
+      return {
+        formFactor: "mobile",
+        throttlingMethod: "simulate",
+        throttling: MOBILE_THROTTLING,
+        screenEmulation: MOBILE_SCREEN,
+      };
+    }
+    case "none": {
+      // "provided" tells Lighthouse to treat observed timings as real -- no simulated CPU or network slowdown.
+      return {
+        formFactor: "desktop",
+        throttlingMethod: "provided",
+        throttling: NO_THROTTLING,
+        screenEmulation: DESKTOP_SCREEN,
+      };
+    }
+  }
 }
 
 // Build a map from audit id to Lighthouse category id by walking lhr.categories[*].auditRefs.
@@ -117,7 +203,10 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
 
 // Lighthouse spawns its own Chrome instance separately from the Playwright browser.
 // Unifying these is deferred debt -- see architecture spec section 13.4.
-async function runLighthouse(pageUrl: string): Promise<LighthouseRunnerResult> {
+async function runLighthouse(
+  pageUrl: string,
+  throttling: ThrottlingPreset,
+): Promise<LighthouseRunnerResult> {
   let chrome;
   try {
     chrome = await launch({
@@ -128,10 +217,12 @@ async function runLighthouse(pageUrl: string): Promise<LighthouseRunnerResult> {
   }
 
   try {
+    const presetSettings = buildLighthouseConfig(throttling);
     const result = await lighthouse(pageUrl, {
       port: chrome.port,
       output: "json",
       logLevel: "error",
+      ...presetSettings,
     });
 
     if (!result?.lhr) {
@@ -163,5 +254,11 @@ async function runLighthouse(pageUrl: string): Promise<LighthouseRunnerResult> {
   }
 }
 
-export { runLighthouse, mapLighthouseAuditToFinding, extractMetrics, buildAuditCategoryMap };
-export type { LighthouseRunnerResult, LighthouseAudit, LighthouseCategory };
+export {
+  runLighthouse,
+  mapLighthouseAuditToFinding,
+  extractMetrics,
+  buildAuditCategoryMap,
+  buildLighthouseConfig,
+};
+export type { LighthouseRunnerResult, LighthouseAudit, LighthouseCategory, ThrottlingPreset };

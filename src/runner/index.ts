@@ -2,6 +2,7 @@ import { RunnerError, formatErrorChain } from "../errors.js";
 import { createBrowser, createPage, waitForPageReady } from "./browser.js";
 import { runAxe } from "./axe.js";
 import { runLighthouse } from "./lighthouse.js";
+import type { ThrottlingPreset } from "./lighthouse.js";
 import { runSemanticChecks } from "./semantic.js";
 import { runBundleChecks } from "./bundle.js";
 import type {
@@ -16,6 +17,7 @@ interface RunnerOptions {
   urls: string[];
   checks: CheckCategory[];
   quiet: boolean;
+  throttling: ThrottlingPreset;
 }
 
 function log(message: string, quiet: boolean): void {
@@ -110,7 +112,7 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
         if (options.checks.includes("perf")) {
           log("Running performance checks", options.quiet);
           try {
-            const lighthouseResult = await runLighthouse(url);
+            const lighthouseResult = await runLighthouse(url, options.throttling);
             metrics = { ...metrics, ...lighthouseResult.metrics };
             findings.push(...lighthouseResult.findings);
           } catch (error) {
@@ -175,3 +177,5 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
 
 export { runAudit };
 export type { RunnerOptions };
+
+export { type ThrottlingPreset } from "./lighthouse.js";

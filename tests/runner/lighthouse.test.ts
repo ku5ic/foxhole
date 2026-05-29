@@ -8,6 +8,7 @@ import {
   mapLighthouseAuditToFinding,
   extractMetrics,
   buildAuditCategoryMap,
+  buildLighthouseConfig,
   type LighthouseAudit,
   type LighthouseCategory,
 } from "../../src/runner/lighthouse.js";
@@ -374,5 +375,56 @@ describe("fixture round-trip", () => {
     expect(map.get("aria-allowed-attr")).toBe("accessibility");
     expect(map.get("document-title")).toBe("accessibility");
     expect(map.get("render-blocking-resources")).toBe("performance");
+  });
+});
+
+describe("buildLighthouseConfig", () => {
+  it("desktop preset uses simulate throttling with desktop form factor", () => {
+    const config = buildLighthouseConfig("desktop");
+    expect(config.formFactor).toBe("desktop");
+    expect(config.throttlingMethod).toBe("simulate");
+    expect(config.throttling.cpuSlowdownMultiplier).toBe(1);
+    expect(config.screenEmulation.mobile).toBe(false);
+  });
+
+  it("mobile preset uses simulate throttling with mobile form factor and 4x CPU slowdown", () => {
+    const config = buildLighthouseConfig("mobile");
+    expect(config.formFactor).toBe("mobile");
+    expect(config.throttlingMethod).toBe("simulate");
+    expect(config.throttling.cpuSlowdownMultiplier).toBe(4);
+    expect(config.screenEmulation.mobile).toBe(true);
+  });
+
+  it("none preset uses provided throttling with desktop form factor and no CPU slowdown", () => {
+    const config = buildLighthouseConfig("none");
+    expect(config.formFactor).toBe("desktop");
+    expect(config.throttlingMethod).toBe("provided");
+    expect(config.throttling.cpuSlowdownMultiplier).toBe(1);
+    expect(config.throttling.rttMs).toBe(0);
+    expect(config.screenEmulation.mobile).toBe(false);
+  });
+
+  it("desktop preset uses desktopDense4G network values (40ms RTT, 10Mbps)", () => {
+    const config = buildLighthouseConfig("desktop");
+    expect(config.throttling.rttMs).toBe(40);
+    expect(config.throttling.throughputKbps).toBe(10_240);
+  });
+
+  it("mobile preset uses mobileSlow4G network values (150ms RTT, ~1.6Mbps)", () => {
+    const config = buildLighthouseConfig("mobile");
+    expect(config.throttling.rttMs).toBe(150);
+    expect(config.throttling.throughputKbps).toBeCloseTo(1638.4);
+  });
+
+  it("none preset has desktop screen dimensions (1350x940)", () => {
+    const config = buildLighthouseConfig("none");
+    expect(config.screenEmulation.width).toBe(1350);
+    expect(config.screenEmulation.height).toBe(940);
+  });
+
+  it("mobile preset has mobile screen dimensions (412x823)", () => {
+    const config = buildLighthouseConfig("mobile");
+    expect(config.screenEmulation.width).toBe(412);
+    expect(config.screenEmulation.height).toBe(823);
   });
 });
