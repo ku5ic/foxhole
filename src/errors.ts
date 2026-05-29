@@ -49,5 +49,32 @@ function err<E extends FoxholeError>(error: E): Result<never, E> {
   return { ok: false, error };
 }
 
-export { FoxholeError, ConfigError, RunnerError, NetworkError, ReportError, ok, err };
+function formatErrorChain(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+  const parts: string[] = [error.message];
+  let cause: unknown = error.cause;
+  while (cause !== undefined && cause !== null) {
+    if (cause instanceof Error) {
+      parts.push(cause.message);
+      cause = cause.cause;
+    } else {
+      parts.push(String(cause));
+      break;
+    }
+  }
+  return parts.join(": ");
+}
+
+export {
+  FoxholeError,
+  ConfigError,
+  RunnerError,
+  NetworkError,
+  ReportError,
+  ok,
+  err,
+  formatErrorChain,
+};
 export type { Result };

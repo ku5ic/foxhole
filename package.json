@@ -35,6 +35,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axe-core": "^4.11.2",
+    "chrome-launcher": "^1.2.1",
     "commander": "^14.0.3",
     "lighthouse": "^13.1.0",
     "playwright": "^1.59.1",
