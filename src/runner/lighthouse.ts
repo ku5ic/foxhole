@@ -16,8 +16,27 @@ interface LighthouseAudit {
   title: string;
   description: string;
   score: number | null;
+  scoreDisplayMode?: string;
   displayValue?: string;
   numericValue?: number;
+}
+
+interface LighthouseCategory {
+  score: number | null;
+  auditRefs: { id: string }[];
+}
+
+// Build a map from audit id to Lighthouse category id by walking lhr.categories[*].auditRefs.
+function buildAuditCategoryMap(
+  categories: Record<string, LighthouseCategory>,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [categoryId, category] of Object.entries(categories)) {
+    for (const ref of category.auditRefs) {
+      map.set(ref.id, categoryId);
+    }
+  }
+  return map;
 }
 
 function extractMetrics(
@@ -42,6 +61,11 @@ function extractMetrics(
 }
 
 function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): Finding | null {
+  // Only binary and numeric audits are pass/fail signals. notApplicable, informative,
+  // manual, and metricSavings have null scores that do not indicate failure (ADR-009).
+  const { scoreDisplayMode } = audit;
+  if (scoreDisplayMode !== "binary" && scoreDisplayMode !== "numeric") return null;
+
   // Passing audits are not findings per the finding-normalization skill.
   if (audit.score !== null && audit.score >= 0.9) return null;
 
@@ -116,12 +140,16 @@ async function runLighthouse(pageUrl: string): Promise<LighthouseRunnerResult> {
 
     const { lhr } = result;
     const audits = lhr.audits as Record<string, LighthouseAudit>;
-    const categories = lhr.categories as Record<string, { score: number | null }>;
+    const categories = lhr.categories as Record<string, LighthouseCategory>;
 
     const metrics = extractMetrics(audits, categories);
+    const auditCategoryMap = buildAuditCategoryMap(categories);
 
     const findings: Finding[] = [];
-    for (const audit of Object.values(audits)) {
+    for (const [auditId, audit] of Object.entries(audits)) {
+      // Lighthouse accessibility audits are dropped: axe-core owns a11y (ADR-009).
+      // Best-practices and SEO are out of scope for v1.
+      if (auditCategoryMap.get(auditId) !== "performance") continue;
       const finding = mapLighthouseAuditToFinding(audit, pageUrl);
       if (finding !== null) findings.push(finding);
     }
@@ -135,5 +163,5 @@ async function runLighthouse(pageUrl: string): Promise<LighthouseRunnerResult> {
   }
 }
 
-export { runLighthouse, mapLighthouseAuditToFinding, extractMetrics };
-export type { LighthouseRunnerResult, LighthouseAudit };
+export { runLighthouse, mapLighthouseAuditToFinding, extractMetrics, buildAuditCategoryMap };
+export type { LighthouseRunnerResult, LighthouseAudit, LighthouseCategory };

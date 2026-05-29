@@ -76,7 +76,7 @@ function makeReport(overrides: Partial<AuditReport> = {}): AuditReport {
       passed: true,
       concurrency: 1,
       perf_runs: 1,
-      perf_profile: "standard",
+      perf_profile: "none",
       source_maps: "auto",
       dependencies: { axe_core: "0.0.0", lighthouse: "0.0.0", playwright: "0.0.0" },
     },
@@ -172,7 +172,7 @@ describe("diffReports", () => {
     const diff = diffReports(before, after);
     expect(diff.comparable).toBe(false);
     expect(diff.comparability_notes).toHaveLength(1);
-    expect(diff.comparability_notes[0]).toContain("standard");
+    expect(diff.comparability_notes[0]).toContain("none");
     expect(diff.comparability_notes[0]).toContain("mobile");
   });
 
@@ -201,7 +201,7 @@ describe("diffReports", () => {
     const before = makeReport({
       meta: {
         ...makeReport().meta,
-        perf_profile: "fast",
+        perf_profile: "desktop",
         dependencies: { axe_core: "4.7.0", lighthouse: "10.0.0", playwright: "1.40.0" },
       },
     });

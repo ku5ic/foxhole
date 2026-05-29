@@ -176,7 +176,7 @@ export interface RunMeta {
   passed: boolean; // true if all pages succeeded and score met threshold
   concurrency: number; // value used for this run
   perf_runs: number; // value used for this run
-  perf_profile: "fast" | "standard" | "mobile";
+  perf_profile: "desktop" | "mobile" | "none";
   source_maps: "auto" | "on" | "off";
   dependencies: {
     axe_core: string; // version of axe-core used
@@ -189,7 +189,7 @@ export interface RunMeta {
 Two changes from the v1 spec draft:
 
 1. `crawl_depth` removed. Crawling is deferred to v2; the field has no meaning in v1.
-2. `concurrency`, `perf_runs`, `perf_profile`, `source_maps`, and `dependencies` added. The architecture spec's accuracy concerns require capturing the run configuration in the report so two reports can be meaningfully compared. A perf score from a `fast` profile is not comparable to one from a `mobile` profile, and the report must show that.
+2. `concurrency`, `perf_runs`, `perf_profile`, `source_maps`, and `dependencies` added. The architecture spec's accuracy concerns require capturing the run configuration in the report so two reports can be meaningfully compared. A perf score from a `none` profile is not comparable to one from a `mobile` profile, and the report must show that. `perf_profile` carries the Lighthouse throttling preset used for the run: `desktop` (simulated dense-4G, desktop form factor), `mobile` (simulated slow-4G, 4x CPU, mobile form factor), or `none` (observed conditions, no simulation).
 
 `dependencies` is the audit trail for "did this finding regress because the code regressed, or because axe got smarter". Without it, run comparison across time becomes unreliable.
 
@@ -538,7 +538,7 @@ The full catalog content is out of scope for this spec; it lives in its own docu
     "passed": false,
     "concurrency": 1,
     "perf_runs": 1,
-    "perf_profile": "standard",
+    "perf_profile": "none",
     "source_maps": "auto",
     "dependencies": {
       "axe_core": "4.10.0",

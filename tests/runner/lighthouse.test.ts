@@ -7,14 +7,16 @@ import { describe, it, expect, vi } from "vitest";
 import {
   mapLighthouseAuditToFinding,
   extractMetrics,
+  buildAuditCategoryMap,
   type LighthouseAudit,
+  type LighthouseCategory,
 } from "../../src/runner/lighthouse.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 interface RawFixture {
   audits: Record<string, LighthouseAudit>;
-  categories: Record<string, { score: number | null }>;
+  categories: Record<string, LighthouseCategory>;
 }
 
 function loadFixture(): RawFixture {
@@ -30,13 +32,14 @@ function makeAudit(overrides: Partial<LighthouseAudit> = {}): LighthouseAudit {
     title: "Eliminate render-blocking resources",
     description: "Resources are blocking the first paint of your page.",
     score: 0.4,
+    scoreDisplayMode: "numeric",
     displayValue: "Potential savings of 560 ms",
     ...overrides,
   };
 }
 
 describe("mapLighthouseAuditToFinding - catalog hit", () => {
-  it("produces a Finding for a catalogued audit with score 0.4 (critical from catalog)", () => {
+  it("produces a Finding for a catalogued audit with score 0.4 (major from catalog)", () => {
     const finding = mapLighthouseAuditToFinding(
       makeAudit({ id: "render-blocking-resources", score: 0.4 }),
       PAGE_URL,
@@ -72,6 +75,68 @@ describe("mapLighthouseAuditToFinding - catalog hit", () => {
   });
 });
 
+describe("mapLighthouseAuditToFinding - scoreDisplayMode filtering", () => {
+  it("returns null for notApplicable regardless of score", () => {
+    const finding = mapLighthouseAuditToFinding(
+      makeAudit({ score: null, scoreDisplayMode: "notApplicable" }),
+      PAGE_URL,
+    );
+    expect(finding).toBeNull();
+  });
+
+  it("returns null for informative regardless of score", () => {
+    const finding = mapLighthouseAuditToFinding(
+      makeAudit({ score: null, scoreDisplayMode: "informative" }),
+      PAGE_URL,
+    );
+    expect(finding).toBeNull();
+  });
+
+  it("returns null for manual regardless of score", () => {
+    const finding = mapLighthouseAuditToFinding(
+      makeAudit({ score: null, scoreDisplayMode: "manual" }),
+      PAGE_URL,
+    );
+    expect(finding).toBeNull();
+  });
+
+  it("returns null for metricSavings regardless of score", () => {
+    const finding = mapLighthouseAuditToFinding(
+      makeAudit({ score: null, scoreDisplayMode: "metricSavings" }),
+      PAGE_URL,
+    );
+    expect(finding).toBeNull();
+  });
+
+  it("returns null when scoreDisplayMode is absent", () => {
+    const audit: LighthouseAudit = {
+      id: "render-blocking-resources",
+      title: "Eliminate render-blocking resources",
+      description: "Resources are blocking the first paint of your page.",
+      score: 0.3,
+      displayValue: "Potential savings of 560 ms",
+    };
+    const finding = mapLighthouseAuditToFinding(audit, PAGE_URL);
+    expect(finding).toBeNull();
+  });
+
+  it("produces a finding for numeric with score below 0.9", () => {
+    const finding = mapLighthouseAuditToFinding(
+      makeAudit({ scoreDisplayMode: "numeric", score: 0.4 }),
+      PAGE_URL,
+    );
+    expect(finding).not.toBeNull();
+  });
+
+  it("produces a finding for binary with score 0 (failing)", () => {
+    const finding = mapLighthouseAuditToFinding(
+      makeAudit({ id: "unknown-binary-audit", scoreDisplayMode: "binary", score: 0 }),
+      PAGE_URL,
+    );
+    expect(finding).not.toBeNull();
+  });
+});
+
 describe("mapLighthouseAuditToFinding - passing audits", () => {
   it("returns null for score >= 0.9 (passing)", () => {
     const finding = mapLighthouseAuditToFinding(makeAudit({ score: 0.95 }), PAGE_URL);
@@ -101,9 +166,9 @@ describe("mapLighthouseAuditToFinding - catalog miss fallback", () => {
     expect(finding?.severity).toBe("major");
   });
 
-  it("maps null score to critical when rule is not catalogued", () => {
+  it("maps null score to critical for binary audits when rule is not catalogued", () => {
     const finding = mapLighthouseAuditToFinding(
-      makeAudit({ id: "unknown-audit", score: null }),
+      makeAudit({ id: "unknown-audit", score: null, scoreDisplayMode: "binary" }),
       PAGE_URL,
     );
     expect(finding?.severity).toBe("critical");
@@ -162,6 +227,59 @@ describe("mapLighthouseAuditToFinding - ID stability", () => {
   });
 });
 
+describe("buildAuditCategoryMap", () => {
+  it("maps performance audit ids to the performance category", () => {
+    const categories: Record<string, LighthouseCategory> = {
+      performance: {
+        score: 0.71,
+        auditRefs: [{ id: "render-blocking-resources" }, { id: "unused-javascript" }],
+      },
+      accessibility: {
+        score: 1,
+        auditRefs: [{ id: "aria-allowed-attr" }, { id: "frame-title" }],
+      },
+    };
+    const map = buildAuditCategoryMap(categories);
+    expect(map.get("render-blocking-resources")).toBe("performance");
+    expect(map.get("unused-javascript")).toBe("performance");
+  });
+
+  it("maps accessibility audit ids to the accessibility category", () => {
+    const categories: Record<string, LighthouseCategory> = {
+      performance: { score: 0.9, auditRefs: [{ id: "render-blocking-resources" }] },
+      accessibility: {
+        score: 0.8,
+        auditRefs: [{ id: "aria-allowed-attr" }, { id: "frame-title" }],
+      },
+    };
+    const map = buildAuditCategoryMap(categories);
+    expect(map.get("aria-allowed-attr")).toBe("accessibility");
+    expect(map.get("frame-title")).toBe("accessibility");
+  });
+
+  it("accessibility audits do not map to performance (the category runLighthouse emits findings for)", () => {
+    const categories: Record<string, LighthouseCategory> = {
+      performance: { score: 0.9, auditRefs: [{ id: "render-blocking-resources" }] },
+      accessibility: { score: 0.8, auditRefs: [{ id: "aria-allowed-attr" }] },
+    };
+    const map = buildAuditCategoryMap(categories);
+    expect(map.get("aria-allowed-attr")).not.toBe("performance");
+  });
+
+  it("returns an empty map when categories is empty", () => {
+    const map = buildAuditCategoryMap({});
+    expect(map.size).toBe(0);
+  });
+
+  it("handles categories with empty auditRefs arrays", () => {
+    const categories: Record<string, LighthouseCategory> = {
+      performance: { score: null, auditRefs: [] },
+    };
+    const map = buildAuditCategoryMap(categories);
+    expect(map.size).toBe(0);
+  });
+});
+
 describe("extractMetrics", () => {
   it("extracts all metrics from fixture audits and categories", () => {
     const { audits, categories } = loadFixture();
@@ -191,7 +309,10 @@ describe("extractMetrics", () => {
   it("rounds performance_score and accessibility_score to integers", () => {
     const metrics = extractMetrics(
       {},
-      { performance: { score: 0.714 }, accessibility: { score: 0.876 } },
+      {
+        performance: { score: 0.714, auditRefs: [] },
+        accessibility: { score: 0.876, auditRefs: [] },
+      },
     );
     expect(metrics.performance_score).toBe(71);
     expect(metrics.accessibility_score).toBe(88);
@@ -199,14 +320,14 @@ describe("extractMetrics", () => {
 });
 
 describe("fixture round-trip", () => {
-  it("maps all failing audits in lighthouse-raw.json without throwing", () => {
+  it("maps all audits in lighthouse-raw.json without throwing", () => {
     const { audits } = loadFixture();
     expect(() => {
       for (const audit of Object.values(audits)) mapLighthouseAuditToFinding(audit, PAGE_URL);
     }).not.toThrow();
   });
 
-  it("produces well-formed findings from the fixture", () => {
+  it("produces well-formed findings only from numeric/binary performance audits below 0.9", () => {
     const { audits } = loadFixture();
     const findings = Object.values(audits)
       .map((a) => mapLighthouseAuditToFinding(a, PAGE_URL))
@@ -222,11 +343,36 @@ describe("fixture round-trip", () => {
     }
   });
 
+  it("does not produce findings for notApplicable or informative audits in the fixture", () => {
+    const { audits } = loadFixture();
+    const nonScoredAudits = Object.values(audits).filter(
+      (a) => a.scoreDisplayMode === "notApplicable" || a.scoreDisplayMode === "informative",
+    );
+    expect(nonScoredAudits.length).toBeGreaterThan(0);
+    for (const audit of nonScoredAudits) {
+      expect(mapLighthouseAuditToFinding(audit, PAGE_URL)).toBeNull();
+    }
+  });
+
   it("does not produce findings for passing audits (score >= 0.9)", () => {
     const { audits } = loadFixture();
-    const passingAudits = Object.values(audits).filter((a) => a.score !== null && a.score >= 0.9);
+    const passingAudits = Object.values(audits).filter(
+      (a) =>
+        (a.scoreDisplayMode === "binary" || a.scoreDisplayMode === "numeric") &&
+        a.score !== null &&
+        a.score >= 0.9,
+    );
+    expect(passingAudits.length).toBeGreaterThan(0);
     for (const audit of passingAudits) {
       expect(mapLighthouseAuditToFinding(audit, PAGE_URL)).toBeNull();
     }
+  });
+
+  it("accessibility audits in the fixture do not map to performance via buildAuditCategoryMap", () => {
+    const { categories } = loadFixture();
+    const map = buildAuditCategoryMap(categories);
+    expect(map.get("aria-allowed-attr")).toBe("accessibility");
+    expect(map.get("document-title")).toBe("accessibility");
+    expect(map.get("render-blocking-resources")).toBe("performance");
   });
 });

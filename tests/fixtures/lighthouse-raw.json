@@ -5,6 +5,7 @@
       "title": "Largest Contentful Paint",
       "description": "Largest Contentful Paint marks the time at which the largest text or image is painted.",
       "score": 0.42,
+      "scoreDisplayMode": "numeric",
       "numericValue": 3800,
       "displayValue": "3.8 s"
     },
@@ -13,6 +14,7 @@
       "title": "First Contentful Paint",
       "description": "First Contentful Paint marks the time at which the first text or image is painted.",
       "score": 0.72,
+      "scoreDisplayMode": "numeric",
       "numericValue": 1800,
       "displayValue": "1.8 s"
     },
@@ -21,6 +23,7 @@
       "title": "Cumulative Layout Shift",
       "description": "Cumulative Layout Shift measures the movement of visible page content.",
       "score": 0.88,
+      "scoreDisplayMode": "numeric",
       "numericValue": 0.12,
       "displayValue": "0.12"
     },
@@ -29,6 +32,7 @@
       "title": "Initial server response time was short",
       "description": "Keep the server response time for the main document short.",
       "score": 0.95,
+      "scoreDisplayMode": "numeric",
       "numericValue": 180,
       "displayValue": "Root document took 180 ms"
     },
@@ -37,6 +41,7 @@
       "title": "Total Blocking Time",
       "description": "Sum of all time periods between FCP and Time to Interactive.",
       "score": 0.65,
+      "scoreDisplayMode": "numeric",
       "numericValue": 280,
       "displayValue": "280 ms"
     },
@@ -45,6 +50,7 @@
       "title": "Max Potential First Input Delay",
       "description": "The maximum potential First Input Delay that users could experience.",
       "score": 0.78,
+      "scoreDisplayMode": "numeric",
       "numericValue": 110,
       "displayValue": "110 ms"
     },
@@ -53,6 +59,7 @@
       "title": "Eliminate render-blocking resources",
       "description": "Resources are blocking the first paint of your page.",
       "score": 0.48,
+      "scoreDisplayMode": "numeric",
       "displayValue": "Potential savings of 560 ms"
     },
     "unused-javascript": {
@@ -60,17 +67,58 @@
       "title": "Reduce unused JavaScript",
       "description": "Reduce unused JavaScript and defer loading scripts until they are required.",
       "score": 0.62,
+      "scoreDisplayMode": "numeric",
       "displayValue": "Potential savings of 84 KiB"
     },
     "uses-text-compression": {
       "id": "uses-text-compression",
       "title": "Enable text compression",
       "description": "Text-based resources should be served with compression to minimize total network bytes.",
-      "score": 0.94
+      "score": 0.94,
+      "scoreDisplayMode": "numeric"
+    },
+    "aria-allowed-attr": {
+      "id": "aria-allowed-attr",
+      "title": "ARIA attributes match their roles",
+      "description": "Each ARIA role supports a specific subset of aria-* attributes.",
+      "score": null,
+      "scoreDisplayMode": "notApplicable"
+    },
+    "document-title": {
+      "id": "document-title",
+      "title": "Document has a title element",
+      "description": "The title gives screen reader users an overview of the page.",
+      "score": 1,
+      "scoreDisplayMode": "binary"
+    },
+    "network-rtt": {
+      "id": "network-rtt",
+      "title": "Network round trip times",
+      "description": "Network round trip times (RTT) have a large impact on performance.",
+      "score": null,
+      "scoreDisplayMode": "informative",
+      "numericValue": 5
     }
   },
   "categories": {
-    "performance": { "score": 0.71 },
-    "accessibility": { "score": 0.87 }
+    "performance": {
+      "score": 0.71,
+      "auditRefs": [
+        { "id": "largest-contentful-paint" },
+        { "id": "first-contentful-paint" },
+        { "id": "cumulative-layout-shift" },
+        { "id": "server-response-time" },
+        { "id": "total-blocking-time" },
+        { "id": "max-potential-fid" },
+        { "id": "render-blocking-resources" },
+        { "id": "unused-javascript" },
+        { "id": "uses-text-compression" },
+        { "id": "network-rtt" }
+      ]
+    },
+    "accessibility": {
+      "score": 0.87,
+      "auditRefs": [{ "id": "aria-allowed-attr" }, { "id": "document-title" }]
+    }
   }
 }

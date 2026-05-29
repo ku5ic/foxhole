@@ -80,7 +80,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
       passed,
       concurrency: 1,
       perf_runs: 1,
-      perf_profile: "standard",
+      perf_profile: "none",
       source_maps: "auto",
       dependencies: {
         axe_core: readDependencyVersion("axe-core"),

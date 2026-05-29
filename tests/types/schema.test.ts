@@ -37,7 +37,7 @@ const validMeta = {
   passed: true,
   concurrency: 1,
   perf_runs: 1,
-  perf_profile: "standard" as const,
+  perf_profile: "none" as const,
   source_maps: "auto" as const,
   dependencies: { axe_core: "4.10.0", lighthouse: "12.2.1", playwright: "1.48.0" },
 };
@@ -112,6 +112,11 @@ describe("runMetaSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects deprecated perf_profile values fast and standard", () => {
+    expect(runMetaSchema.safeParse({ ...validMeta, perf_profile: "fast" }).success).toBe(false);
+    expect(runMetaSchema.safeParse({ ...validMeta, perf_profile: "standard" }).success).toBe(false);
+  });
+
   it("rejects invalid source_maps value", () => {
     const result = runMetaSchema.safeParse({ ...validMeta, source_maps: "enabled" });
     expect(result.success).toBe(false);
@@ -181,7 +186,7 @@ describe("runDiffSchema", () => {
   const metaSnapshot = {
     foxhole_version: "0.1.0",
     audited_at: "2026-04-07T12:00:00.000Z",
-    perf_profile: "standard" as const,
+    perf_profile: "none" as const,
     dependencies: { axe_core: "4.10.0", lighthouse: "12.2.1", playwright: "1.48.0" },
   };
 

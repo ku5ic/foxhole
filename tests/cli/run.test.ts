@@ -34,7 +34,7 @@ function makeReport(passed = true): AuditReport {
       passed,
       concurrency: 1,
       perf_runs: 1,
-      perf_profile: "standard",
+      perf_profile: "none",
       source_maps: "auto",
       dependencies: { axe_core: "0.0.0", lighthouse: "0.0.0", playwright: "0.0.0" },
     },
