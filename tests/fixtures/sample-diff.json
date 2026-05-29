@@ -2,7 +2,7 @@
   "before_meta": {
     "foxhole_version": "0.1.0",
     "audited_at": "2026-04-06T12:00:00.000Z",
-    "perf_profile": "standard",
+    "perf_profile": "none",
     "dependencies": {
       "axe_core": "4.10.0",
       "lighthouse": "12.2.1",
@@ -12,7 +12,7 @@
   "after_meta": {
     "foxhole_version": "0.1.0",
     "audited_at": "2026-04-07T12:00:00.000Z",
-    "perf_profile": "standard",
+    "perf_profile": "none",
     "dependencies": {
       "axe_core": "4.10.0",
       "lighthouse": "12.2.1",

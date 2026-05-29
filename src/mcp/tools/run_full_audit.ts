@@ -37,6 +37,7 @@ const runFullAuditTool = {
       checks,
       quiet: true,
       threshold: input.threshold,
+      throttling: "none",
     });
     return JSON.stringify(report);
   },

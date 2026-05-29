@@ -18,6 +18,7 @@ const runPerformanceAuditTool = {
       urls: [input.url],
       checks: ["perf"],
       quiet: true,
+      throttling: "none",
     });
     const page = report.pages[0];
     const result = {

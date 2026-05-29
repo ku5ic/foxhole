@@ -98,7 +98,7 @@ const runMetaSchema = z
     passed: z.boolean(),
     concurrency: z.number().int(),
     perf_runs: z.number().int(),
-    perf_profile: z.enum(["fast", "standard", "mobile"]),
+    perf_profile: z.enum(["desktop", "mobile", "none"]),
     source_maps: z.enum(["auto", "on", "off"]),
     dependencies: dependenciesSchema,
   })

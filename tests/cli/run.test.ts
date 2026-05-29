@@ -34,7 +34,7 @@ function makeReport(passed = true): AuditReport {
       passed,
       concurrency: 1,
       perf_runs: 1,
-      perf_profile: "standard",
+      perf_profile: "none",
       source_maps: "auto",
       dependencies: { axe_core: "0.0.0", lighthouse: "0.0.0", playwright: "0.0.0" },
     },
@@ -129,5 +129,44 @@ describe("handleRun --build lifecycle", () => {
     await handleRun({ urls: "https://example.com" });
 
     expect(serveStaticBuild).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleRun --throttling", () => {
+  it("passes desktop throttling preset to buildAuditReport", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ url: "https://example.com", throttling: "desktop" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(
+      expect.objectContaining({ throttling: "desktop" }),
+    );
+  });
+
+  it("passes mobile throttling preset to buildAuditReport", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ url: "https://example.com", throttling: "mobile" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(
+      expect.objectContaining({ throttling: "mobile" }),
+    );
+  });
+
+  it("defaults to none when --throttling is not given", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ url: "https://example.com" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ throttling: "none" }));
+  });
+
+  it("exits with code 2 for an invalid throttling preset", async () => {
+    await expect(
+      handleRun({ url: "https://example.com", throttling: "turbo" }),
+    ).rejects.toMatchObject({ code: 2 });
+    expect(stderrSpy).toHaveBeenCalledWith(
+      'Error: --throttling must be one of: desktop, mobile, none (got "turbo")\n',
+    );
   });
 });

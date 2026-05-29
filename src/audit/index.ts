@@ -3,6 +3,7 @@ import path from "node:path";
 import url from "node:url";
 
 import { runAudit } from "../runner/index.js";
+import type { ThrottlingPreset } from "../runner/index.js";
 import { scorePage, scoreReport } from "./score.js";
 import { prioritizeFindings } from "./prioritize.js";
 import { summarizeReport } from "./summarize.js";
@@ -13,6 +14,7 @@ interface BuildAuditOptions {
   checks: CheckCategory[];
   quiet: boolean;
   threshold?: number | undefined;
+  throttling: ThrottlingPreset;
 }
 
 function readPackageJsonVersion(packageJsonPath: string): string {
@@ -49,6 +51,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
     urls: options.urls,
     checks: options.checks,
     quiet: options.quiet,
+    throttling: options.throttling,
   });
 
   const scoredPages = rawPages.map((page) => scorePage(page, options.checks));
@@ -80,7 +83,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
       passed,
       concurrency: 1,
       perf_runs: 1,
-      perf_profile: "standard",
+      perf_profile: options.throttling,
       source_maps: "auto",
       dependencies: {
         axe_core: readDependencyVersion("axe-core"),

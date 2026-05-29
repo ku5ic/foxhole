@@ -134,7 +134,7 @@
     "passed": false,
     "concurrency": 1,
     "perf_runs": 1,
-    "perf_profile": "standard",
+    "perf_profile": "none",
     "source_maps": "auto",
     "dependencies": {
       "axe_core": "4.10.0",
