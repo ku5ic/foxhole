@@ -4,7 +4,8 @@ import type { Command } from "commander";
 
 import { FoxholeError } from "../../errors.js";
 import { loadConfig } from "../../config/load.js";
-import { DEFAULT_CHECKS } from "../../config/defaults.js";
+import { DEFAULT_CHECKS, DEFAULT_THROTTLING } from "../../config/defaults.js";
+import type { ThrottlingPreset } from "../../runner/index.js";
 import { buildAuditReport } from "../../audit/index.js";
 import { renderMarkdownReport } from "../../report/markdown.js";
 import { serveStaticBuild } from "../../server/static.js";
@@ -72,6 +73,7 @@ function registerRunCommand(program: Command): void {
     .option("--out <path>", "file path for output")
     .option("--config <path>", "path to foxhole.config.json")
     .option("--threshold <n>", "fail if score drops below this value", Number.parseFloat)
+    .option("--throttling <preset>", "Lighthouse throttling preset: desktop, mobile, or none")
     .option("--quiet", "suppress progress output")
     .action(async (options: RunOptions) => {
       try {
@@ -100,6 +102,16 @@ async function handleRun(options: RunOptions): Promise<void> {
   const outputFormat = options.output ?? config?.output ?? "markdown";
   const quiet = options.quiet ?? false;
 
+  const rawThrottling = options.throttling ?? config?.throttling ?? DEFAULT_THROTTLING;
+  const VALID_THROTTLING = ["desktop", "mobile", "none"] as const;
+  if (!VALID_THROTTLING.includes(rawThrottling as ThrottlingPreset)) {
+    process.stderr.write(
+      `Error: --throttling must be one of: desktop, mobile, none (got "${rawThrottling}")\n`,
+    );
+    process.exit(2);
+  }
+  const throttling = rawThrottling as ThrottlingPreset;
+
   let server: StaticServer | null = null;
   let report: AuditReport;
   try {
@@ -115,6 +127,7 @@ async function handleRun(options: RunOptions): Promise<void> {
       checks,
       quiet,
       threshold,
+      throttling,
     });
   } finally {
     if (server) await server.close();

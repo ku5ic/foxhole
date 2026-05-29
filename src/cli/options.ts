@@ -7,5 +7,6 @@ export interface RunOptions {
   out?: string;
   config?: string;
   threshold?: number;
+  throttling?: string;
   quiet?: boolean;
 }
