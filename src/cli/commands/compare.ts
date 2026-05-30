@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 
-import { FoxholeError } from "../../errors.js";
+import { FoxholeError, formatErrorChain } from "../../errors.js";
 import { readAuditReport } from "../../audit/read-report.js";
 import { diffReports } from "../../audit/diff.js";
 
@@ -21,7 +21,7 @@ function registerCompareCommand(program: Command): void {
           process.stderr.write(`Error: ${error.message}\n`);
           process.exit(2);
         }
-        process.stderr.write("Unexpected error. Please report this as a bug.\n");
+        process.stderr.write(`Unexpected error: ${formatErrorChain(error)}\n`);
         process.exit(2);
       }
     });

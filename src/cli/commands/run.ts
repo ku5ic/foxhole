@@ -1,9 +1,11 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 
 import type { Command } from "commander";
 
-import { ConfigError, FoxholeError } from "../../errors.js";
+import { ConfigError, FoxholeError, formatErrorChain } from "../../errors.js";
 import { loadConfig } from "../../config/load.js";
+import type { FoxholeConfig } from "../../config/schema.js";
 import { resolveRunOptions } from "../../config/resolve-options.js";
 import { buildAuditReport } from "../../audit/index.js";
 import { renderMarkdownReport } from "../../report/markdown.js";
@@ -70,6 +72,16 @@ function registerRunCommand(program: Command): void {
     .option("--threshold <n>", "fail if score drops below this value", Number.parseFloat)
     .option("--throttling <preset>", "Lighthouse throttling preset: desktop, mobile, or none")
     .option("--quiet", "suppress progress output")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  foxhole run --url https://example.com
+  foxhole run --urls https://example.com,https://example.com/about --checks a11y,perf
+  foxhole run --build ./dist --urls /index.html,/about.html --threshold 80 --out report.json
+
+Config file (foxhole.config.json) is auto-discovered in the current directory when --config is not set.`,
+    )
     .action(async (options: RunOptions) => {
       try {
         await handleRun(options);
@@ -78,16 +90,31 @@ function registerRunCommand(program: Command): void {
           process.stderr.write(`Error: ${error.message}\n`);
           process.exit(2);
         }
-        process.stderr.write("Unexpected error. Please report this as a bug.\n");
+        process.stderr.write(`Unexpected error: ${formatErrorChain(error)}\n`);
         process.exit(2);
       }
     });
 }
 
+// When --config is absent, look for foxhole.config.json in the current working directory.
+// Explicit --config paths always load or throw; auto-discovered config is silently skipped if absent.
+async function loadConfigForRun(
+  configPath: string | undefined,
+): Promise<FoxholeConfig | undefined> {
+  if (configPath) return loadConfig(configPath);
+  const cwdConfig = path.join(process.cwd(), "foxhole.config.json");
+  try {
+    await fs.access(cwdConfig);
+    return loadConfig(cwdConfig);
+  } catch {
+    return undefined;
+  }
+}
+
 async function handleRun(options: RunOptions): Promise<void> {
   const mode = validateInputMode(options);
 
-  const config = options.config ? await loadConfig(options.config) : undefined;
+  const config = await loadConfigForRun(options.config);
 
   let resolved;
   try {
