@@ -298,7 +298,7 @@ If a runner returns `status: "errored"`:
 
 - The category is marked `errored` in the report
 - The error message is included in the report (not the stack trace, that goes to stderr at debug level)
-- The overall run score is computed from successful categories only, with errored categories excluded from the average rather than counted as zero
+- The page score is computed from all findings via exponential decay (ADR-010); errored categories contribute no findings, so their absence lowers the page score only if they would have had findings
 - Exit code is 1 if the partial score still falls below threshold, 2 only if no runners completed at all
 
 If page navigation itself fails (the URL is unreachable, browser crashes mid-load):

@@ -1,19 +1,19 @@
 {
   "version": 1,
-  "summary": "Audited 1 page with an overall score of 77 out of 100. Found 2 issues: 1 critical, 0 major, 1 minor. This build has 1 critical issue that requires immediate attention.",
-  "score": 77,
+  "summary": "Audited 1 page with an overall score of 76 out of 100. Found 2 issues: 1 critical, 0 major, 1 minor. This build has 1 critical issue that requires immediate attention.",
+  "score": 76,
   "pages": [
     {
       "url": "https://example.com",
       "status": "ok",
       "error": null,
-      "score": 77,
+      "score": 76,
       "categories": [
         {
           "category": "a11y",
           "status": "ok",
           "error": null,
-          "score": 85,
+          "score": 78,
           "findings_count": 1,
           "critical_count": 1,
           "major_count": 0,

@@ -145,7 +145,7 @@ export interface PageResult {
   url: string;
   status: "ok" | "errored"; // page-level status, not category-level
   error: { message: string } | null;
-  score: number; // 0-100, computed from category scores. 0 if status is errored.
+  score: number; // 0-100, severity-weighted exponential decay over all page findings. 0 if errored.
   categories: CategorySummary[]; // always 4 entries, one per category, even if some are skipped
   findings: Finding[]; // empty array if status is errored
   metrics: PerformanceMetrics; // all-null if status is errored
@@ -415,7 +415,7 @@ A few relationships worth stating explicitly because they constrain implementati
 
 2. `Fix.pages_affected` is the unique set of `Finding.url` values across `Fix.finding_ids`. Always derivable from the finding ids; never authored separately.
 
-3. `PageResult.score` is computed from the scores of categories with `status: "ok"`. Errored and skipped categories are excluded from the average rather than counted as zero. This is the same rule as the run-level score in `AuditReport.score`.
+3. `PageResult.score` is computed from all findings on the page via a severity-weighted exponential decay curve (see ADR-010). The page scores zero only when there are no ok categories. The run-level `AuditReport.score` is the mean of ok-page scores.
 
 4. `RunMeta.passed` is `true` if and only if every page has `status: "ok"` and `AuditReport.score >= threshold` (or no threshold is set). A single errored page makes the run not passed, even if other pages scored well.
 
