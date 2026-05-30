@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildBundleFindings,
+  hasPathExtension,
   sanitizeResourceUrl,
   type ResourceInfo,
 } from "../../src/runner/bundle.js";
@@ -304,6 +305,28 @@ describe("sanitizeResourceUrl", () => {
 
   it("handles non-parseable URLs without throwing", () => {
     expect(() => sanitizeResourceUrl("not-a-url")).not.toThrow();
+  });
+});
+
+describe("hasPathExtension (BUN-2)", () => {
+  it("detects .js extension in a clean URL", () => {
+    expect(hasPathExtension("https://example.com/main.js", ".js")).toBe(true);
+  });
+
+  it("ignores .js in query string -- uses pathname only", () => {
+    expect(hasPathExtension("https://example.com/loader?bundle=main.js", ".js")).toBe(false);
+  });
+
+  it("detects .css extension in a URL with query params", () => {
+    expect(hasPathExtension("https://example.com/style.css?v=1234", ".css")).toBe(true);
+  });
+
+  it("returns false for a non-matching extension", () => {
+    expect(hasPathExtension("https://example.com/image.png", ".js")).toBe(false);
+  });
+
+  it("handles non-parseable URLs without throwing", () => {
+    expect(() => hasPathExtension("not-a-url.js", ".js")).not.toThrow();
   });
 });
 

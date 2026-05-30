@@ -1,7 +1,7 @@
 import type { Page } from "playwright";
 
-import { catalog } from "../catalog/index.js";
 import { RunnerError } from "../errors.js";
+import { catalogLookup } from "./catalog-lookup.js";
 import { buildSemanticPath, buildTextFingerprint, computeFindingId } from "./finding-id.js";
 import type { Finding } from "../types/index.js";
 
@@ -92,11 +92,7 @@ const SEMANTIC_CHECKS_SCRIPT = `(() => {
 
 function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: string): Finding[] {
   const ruleId = `semantic/${result.check}`;
-  const entry = catalog[ruleId];
-
-  if (!entry && process.env.FOXHOLE_DEBUG === "1") {
-    process.stderr.write(`[foxhole:debug] catalog gap: ruleId=${ruleId}\n`);
-  }
+  const entry = catalogLookup(ruleId);
 
   return result.issues.map((issue) => {
     const semanticPath = issue.outerHTML === null ? "" : buildSemanticPath(issue.outerHTML);

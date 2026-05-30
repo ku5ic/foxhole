@@ -4,8 +4,8 @@ import url from "node:url";
 
 import type { Page } from "playwright";
 
-import { catalog } from "../catalog/index.js";
 import { RunnerError } from "../errors.js";
+import { catalogLookup } from "./catalog-lookup.js";
 import { buildSemanticPath, buildTextFingerprint, computeFindingId } from "./finding-id.js";
 import type { Finding, Severity } from "../types/index.js";
 
@@ -60,11 +60,7 @@ function sanitizeSelector(selector: string): string {
 
 function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Finding[] {
   const ruleId = `a11y/${violation.id}`;
-  const entry = catalog[ruleId];
-
-  if (!entry && process.env.FOXHOLE_DEBUG === "1") {
-    process.stderr.write(`[foxhole:debug] catalog gap: ruleId=${ruleId}\n`);
-  }
+  const entry = catalogLookup(ruleId);
 
   const severity = entry ? entry.default_severity : mapAxeImpactToSeverity(violation.impact);
   const effort = entry ? entry.default_effort : ("medium" as const);

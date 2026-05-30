@@ -7,6 +7,11 @@ interface FindingIdInput {
   textFingerprint: string;
 }
 
+// Finding IDs are page-scoped 64-bit hashes (16 hex chars). They are stable across runs for the
+// same finding on the same page, but not globally unique -- two findings on different pages can
+// share an ID. Callers must not use IDs as global keys; use (page_url, id) pairs instead.
+// semantic_path is derived from HTML structure and may change if the page markup changes,
+// causing the ID to change even when the underlying issue is the same.
 function computeFindingId(input: FindingIdInput): string {
   const raw = `${input.pageUrl}\0${input.ruleId}\0${input.semanticPath}\0${input.textFingerprint}`;
   return createHash("sha256").update(raw).digest("hex").slice(0, 16);

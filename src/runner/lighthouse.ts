@@ -1,8 +1,8 @@
 import lighthouse from "lighthouse";
 import { launch } from "chrome-launcher";
 
-import { catalog } from "../catalog/index.js";
 import { RunnerError } from "../errors.js";
+import { catalogLookup } from "./catalog-lookup.js";
 import { buildTextFingerprint, computeFindingId } from "./finding-id.js";
 import type { Finding, PerformanceMetrics, Severity } from "../types/index.js";
 
@@ -156,11 +156,7 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
   if (audit.score !== null && audit.score >= 0.9) return null;
 
   const ruleId = `perf/${audit.id}`;
-  const entry = catalog[ruleId];
-
-  if (!entry && process.env.FOXHOLE_DEBUG === "1") {
-    process.stderr.write(`[foxhole:debug] catalog gap: ruleId=${ruleId}\n`);
-  }
+  const entry = catalogLookup(ruleId);
 
   let severity: Severity;
   if (entry) {

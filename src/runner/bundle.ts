@@ -1,7 +1,7 @@
 import type { Page, Response as PlaywrightResponse } from "playwright";
 
-import { catalog } from "../catalog/index.js";
 import { RunnerError } from "../errors.js";
+import { catalogLookup } from "./catalog-lookup.js";
 import { buildTextFingerprint, computeFindingId } from "./finding-id.js";
 import type { Finding } from "../types/index.js";
 
@@ -20,10 +20,31 @@ const CSS_CONTENT_TYPES = ["text/css"];
 const MAX_TOTAL_JS_BYTES = 500 * 1024;
 const MAX_SINGLE_JS_BYTES = 200 * 1024;
 const MAX_TOTAL_CSS_BYTES = 100 * 1024;
+// Cap on how many bytes we buffer when Content-Length is absent.
+// Prevents OOM from unexpectedly large responses with no size header.
+const MAX_BODY_BUFFER_BYTES = 10 * 1024 * 1024;
 
 function isContentType(response: PlaywrightResponse, types: string[]): boolean {
   const contentType = response.headers()["content-type"] ?? "";
   return types.some((t) => contentType.includes(t));
+}
+
+function hasPathExtension(rawUrl: string, ext: string): boolean {
+  try {
+    return new URL(rawUrl).pathname.endsWith(ext);
+  } catch {
+    return rawUrl.endsWith(ext);
+  }
+}
+
+async function measureResourceSize(response: PlaywrightResponse): Promise<number> {
+  const contentLength = response.headers()["content-length"];
+  if (contentLength !== undefined) {
+    const parsed = Number.parseInt(contentLength, 10);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  const body = await response.body();
+  return Math.min(body.length, MAX_BODY_BUFFER_BYTES);
 }
 
 function formatKb(bytes: number): string {
@@ -54,7 +75,7 @@ function buildBundleFindings(
 
   if (totalJs > MAX_TOTAL_JS_BYTES) {
     const ruleId = "bundle/total-js-size";
-    const entry = catalog[ruleId];
+    const entry = catalogLookup(ruleId);
     const detail = formatKb(totalJs);
     findings.push({
       id: computeFindingId({
@@ -85,7 +106,7 @@ function buildBundleFindings(
   for (const resource of jsResources) {
     if (resource.size > MAX_SINGLE_JS_BYTES) {
       const ruleId = "bundle/large-javascript-chunk";
-      const entry = catalog[ruleId];
+      const entry = catalogLookup(ruleId);
       const sanitized = sanitizeResourceUrl(resource.url);
       const detail = resource.url;
       findings.push({
@@ -115,7 +136,7 @@ function buildBundleFindings(
 
   if (totalCss > MAX_TOTAL_CSS_BYTES) {
     const ruleId = "bundle/total-css-size";
-    const entry = catalog[ruleId];
+    const entry = catalogLookup(ruleId);
     const detail = formatKb(totalCss);
     findings.push({
       id: computeFindingId({
@@ -144,7 +165,7 @@ function buildBundleFindings(
 
   for (const resourceUrl of httpResources) {
     const ruleId = "bundle/insecure-resource";
-    const entry = catalog[ruleId];
+    const entry = catalogLookup(ruleId);
     const sanitized = sanitizeResourceUrl(resourceUrl);
     findings.push({
       id: computeFindingId({
@@ -198,16 +219,17 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
         httpResources.push(responseUrl);
       }
 
-      const body = await response.body();
-      const size = body.length;
+      const isJs =
+        isContentType(response, JS_CONTENT_TYPES) || hasPathExtension(responseUrl, ".js");
+      const isCss =
+        isContentType(response, CSS_CONTENT_TYPES) || hasPathExtension(responseUrl, ".css");
 
-      if (isContentType(response, JS_CONTENT_TYPES) || responseUrl.endsWith(".js")) {
-        jsResources.push({ url: responseUrl, size });
-      }
+      if (!isJs && !isCss) return;
 
-      if (isContentType(response, CSS_CONTENT_TYPES) || responseUrl.endsWith(".css")) {
-        cssResources.push({ url: responseUrl, size });
-      }
+      const size = await measureResourceSize(response);
+
+      if (isJs) jsResources.push({ url: responseUrl, size });
+      if (isCss) cssResources.push({ url: responseUrl, size });
     } catch {
       // response body may not be available for redirects or certain resource types
     }
@@ -235,5 +257,5 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
   };
 }
 
-export { runBundleChecks, buildBundleFindings, sanitizeResourceUrl };
+export { runBundleChecks, buildBundleFindings, sanitizeResourceUrl, hasPathExtension };
 export type { BundleRunnerResult, ResourceInfo };

@@ -267,7 +267,9 @@ Where:
 - `text_fingerprint` is the first 64 characters of the finding's primary text content. See 2.4.
 - `\0` is a NUL byte separator. Prevents fingerprint collisions where field boundaries are ambiguous.
 
-The hash is truncated to 16 hex characters (64 bits). Collision probability within a single report is negligible.
+The hash is truncated to 16 hex characters (64 bits). Collision probability within a single page is negligible.
+
+**Scope:** IDs are page-scoped, not globally unique across all pages in a report. Two findings on different pages can share the same ID if all four inputs are identical (which cannot happen in practice because `page_url` differs). Consumers must not use `Finding.id` as a global key; use the `(page_url, id)` pair instead. `Fix.finding_ids` references IDs that are unique within the pages they appear on, and `Fix.pages_affected` provides the corresponding URLs.
 
 ### 2.3 Semantic path
 
