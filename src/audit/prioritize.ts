@@ -37,14 +37,12 @@ function prioritizeFindings(findings: Finding[]): Fix[] {
 
     // Use the most severe finding's severity/effort so the fix rank reflects the worst case,
     // not whichever finding happened to arrive first.
-    const severity = groupFindings.reduce<Severity>(
-      (max, f) => (SEVERITY_RANK[f.severity] < SEVERITY_RANK[max] ? f.severity : max),
-      first.severity,
-    );
-    const effort = groupFindings.reduce<Effort>(
-      (max, f) => (EFFORT_RANK[f.effort] < EFFORT_RANK[max] ? f.effort : max),
-      first.effort,
-    );
+    let severity: Severity = first.severity;
+    let effort: Effort = first.effort;
+    for (const f of groupFindings) {
+      if (SEVERITY_RANK[f.severity] < SEVERITY_RANK[severity]) severity = f.severity;
+      if (EFFORT_RANK[f.effort] < EFFORT_RANK[effort]) effort = f.effort;
+    }
 
     fixes.push({
       rank: SEVERITY_RANK[severity],

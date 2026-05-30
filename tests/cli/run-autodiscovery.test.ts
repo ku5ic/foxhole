@@ -15,15 +15,16 @@ vi.mock("../../src/config/load.js", () => ({
   }),
 }));
 
-// Spy on fs.access so we can make the cwd config appear to exist without touching the filesystem.
-vi.mock("node:fs/promises", async (importOriginal) => {
-  const real = await importOriginal<typeof import("node:fs/promises")>();
-  return {
-    ...real,
-    access: vi.fn().mockResolvedValue(undefined),
-    writeFile: vi.fn().mockResolvedValue(undefined),
-  };
-});
+// Make fs.access resolve (file appears to exist) so loadConfigForRun picks up the cwd config.
+// Only access and writeFile are used by run.ts; other fs functions are not needed here.
+vi.mock("node:fs/promises", () => ({
+  default: {
+    access: vi.fn().mockResolvedValue(null),
+    writeFile: vi.fn().mockResolvedValue(null),
+  },
+  access: vi.fn().mockResolvedValue(null),
+  writeFile: vi.fn().mockResolvedValue(null),
+}));
 
 function makeReport(passed = true): AuditReport {
   return {

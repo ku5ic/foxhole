@@ -56,17 +56,15 @@ function renderSummary(report: AuditReport): string {
 function renderScore(report: AuditReport): string {
   const threshold = report.meta.threshold;
   // Only show Pass/Fail when a threshold is configured; without one there is no pass/fail concept.
-  const statusLabel =
-    threshold === null
-      ? null
-      : report.meta.passed
-        ? "Pass"
-        : `Below threshold (${String(threshold)})`;
+  let statusLabel: string | null = null;
+  if (threshold !== null) {
+    statusLabel = report.meta.passed ? "Pass" : `Below threshold (${String(threshold)})`;
+  }
 
   const scoreLine =
-    statusLabel !== null
-      ? `**${String(report.score)} / 100** - ${statusLabel}`
-      : `**${String(report.score)} / 100**`;
+    statusLabel === null
+      ? `**${String(report.score)} / 100**`
+      : `**${String(report.score)} / 100** - ${statusLabel}`;
 
   const lines = ["## Score", "", scoreLine];
 

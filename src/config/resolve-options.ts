@@ -27,13 +27,13 @@ function resolveRunOptions(
 ): ResolvedRunOptions {
   // checks: flag wins; if absent fall back to config, then default
   const checks =
-    rawOptions.checks !== undefined
-      ? validateChecks(rawOptions.checks.split(",").map((s) => s.trim()))
-      : (config?.checks ?? DEFAULT_CHECKS);
+    rawOptions.checks === undefined
+      ? (config?.checks ?? DEFAULT_CHECKS)
+      : validateChecks(rawOptions.checks.split(",").map((s) => s.trim()));
 
   // threshold: flag wins; if absent fall back to config
   const rawThreshold = rawOptions.threshold ?? config?.threshold;
-  const threshold = rawThreshold !== undefined ? validateThreshold(rawThreshold) : undefined;
+  const threshold = rawThreshold === undefined ? undefined : validateThreshold(rawThreshold);
 
   // output: flag wins; if absent fall back to config, then default
   const rawOutput = rawOptions.output ?? config?.output ?? DEFAULT_OUTPUT;
