@@ -4,7 +4,11 @@ import { fileURLToPath } from "node:url";
 
 import { describe, it, expect, vi } from "vitest";
 
-import { mapAxeViolationToFindings, type AxeViolation } from "../../src/runner/axe.js";
+import {
+  mapAxeViolationToFindings,
+  sanitizeSelector,
+  type AxeViolation,
+} from "../../src/runner/axe.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
@@ -213,6 +217,32 @@ describe("mapAxeViolationToFindings - selector handling", () => {
     const [finding] = mapAxeViolationToFindings(violation, PAGE_URL);
     expect(finding?.selector).not.toContain("<");
     expect(finding?.selector).not.toContain(">");
+  });
+
+  it("strips backticks from selectors", () => {
+    const violation = makeViolation({
+      nodes: [{ target: ["div[data-x=`foo`]"], html: "<div>" }],
+    });
+    const [finding] = mapAxeViolationToFindings(violation, PAGE_URL);
+    expect(finding?.selector).not.toContain("`");
+  });
+});
+
+describe("sanitizeSelector", () => {
+  it("strips angle brackets", () => {
+    expect(sanitizeSelector("div<span>")).not.toContain("<");
+  });
+
+  it("strips backticks", () => {
+    expect(sanitizeSelector("div[attr=`val`]")).not.toContain("`");
+  });
+
+  it("truncates to 200 characters", () => {
+    expect(sanitizeSelector("a".repeat(300))).toHaveLength(200);
+  });
+
+  it("returns the string unchanged when no special chars are present", () => {
+    expect(sanitizeSelector("#main .container")).toBe("#main .container");
   });
 });
 

@@ -1,6 +1,6 @@
 import type { PageResult } from "../types/index.js";
 
-function summarizeReport(pages: PageResult[], score: number): string {
+function summarizeReport(pages: PageResult[], score: number, passed: boolean): string {
   const pageCount = pages.length;
   const allFindings = pages.flatMap((p) => p.findings);
   const criticalCount = allFindings.filter((f) => f.severity === "critical").length;
@@ -24,7 +24,7 @@ function summarizeReport(pages: PageResult[], score: number): string {
     parts.push(
       `This build has ${String(criticalCount)} critical ${criticalCount === 1 ? "issue" : "issues"} that ${criticalCount === 1 ? "requires" : "require"} immediate attention.`,
     );
-  } else {
+  } else if (passed) {
     parts.push("This build passes the configured threshold.");
   }
 

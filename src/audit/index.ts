@@ -63,10 +63,10 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
 
   const allFindings = scoredPages.flatMap((page) => page.findings);
   const prioritizedFixes = prioritizeFindings(allFindings);
-  const summary = summarizeReport(scoredPages, overallScore);
 
   const durationMs = Date.now() - startTime;
   const passed = options.threshold === undefined ? true : overallScore >= options.threshold;
+  const summary = summarizeReport(scoredPages, overallScore, passed);
 
   return {
     version: 1,

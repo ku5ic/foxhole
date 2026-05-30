@@ -20,6 +20,11 @@ const SEVERITY_ORDER: Record<string, number> = {
   minor: 2,
 };
 
+function sanitizeMarkdownText(text: string): string {
+  // Escape backticks to prevent them from opening/closing inline code spans inside prose.
+  return text.replaceAll("`", "\\`");
+}
+
 function formatMs(ms: number): string {
   return `${ms.toLocaleString("en-US")}ms`;
 }
@@ -50,15 +55,32 @@ function renderSummary(report: AuditReport): string {
 
 function renderScore(report: AuditReport): string {
   const threshold = report.meta.threshold;
-  let status: string;
+  // Only show Pass/Fail when a threshold is configured; without one there is no pass/fail concept.
+  const statusLabel =
+    threshold === null
+      ? null
+      : report.meta.passed
+        ? "Pass"
+        : `Below threshold (${String(threshold)})`;
 
-  if (threshold === null) {
-    status = report.meta.passed ? "Pass" : "Fail";
-  } else {
-    status = report.meta.passed ? "Pass" : `Below threshold (${String(threshold)})`;
+  const scoreLine =
+    statusLabel !== null
+      ? `**${String(report.score)} / 100** - ${statusLabel}`
+      : `**${String(report.score)} / 100**`;
+
+  const lines = ["## Score", "", scoreLine];
+
+  const firstMetrics = report.pages[0]?.metrics;
+  if (
+    report.meta.checks_run.includes("perf") &&
+    firstMetrics?.performance_score !== null &&
+    firstMetrics?.performance_score !== undefined
+  ) {
+    lines.push(`Lighthouse performance score: ${String(firstMetrics.performance_score)}.`);
   }
 
-  return ["## Score", "", `**${String(report.score)} / 100** - ${status}`, ""].join("\n");
+  lines.push("");
+  return lines.join("\n");
 }
 
 function renderCategories(categories: CategorySummary[]): string {
@@ -145,7 +167,7 @@ function renderFindings(findings: Finding[]): string {
 
     for (const finding of sorted) {
       lines.push(
-        `#### [${finding.severity.charAt(0).toUpperCase()}${finding.severity.slice(1)}] ${finding.title}`,
+        `#### [${finding.severity.charAt(0).toUpperCase()}${finding.severity.slice(1)}] ${sanitizeMarkdownText(finding.title)}`,
         "",
       );
 
@@ -159,7 +181,12 @@ function renderFindings(findings: Finding[]): string {
         const loc = `${finding.source.file}:${String(finding.source.line)}:${String(finding.source.column)}`;
         lines.push(`**Source:** ${loc}`);
       }
-      lines.push(`**Recommendation:** ${finding.recommendation}`, "", "---", "");
+      lines.push(
+        `**Recommendation:** ${sanitizeMarkdownText(finding.recommendation)}`,
+        "",
+        "---",
+        "",
+      );
     }
   }
 
@@ -170,6 +197,7 @@ function renderMetrics(metrics: PerformanceMetrics): string {
   const lines = ["## Performance metrics", "", "| Metric | Value |", "| --- | --- |"];
 
   if (metrics.lcp !== null) lines.push(`| LCP | ${formatMs(metrics.lcp)} |`);
+  if (metrics.fid !== null) lines.push(`| FID | ${formatMs(metrics.fid)} |`);
   if (metrics.fcp !== null) lines.push(`| FCP | ${formatMs(metrics.fcp)} |`);
   if (metrics.tbt !== null) lines.push(`| TBT | ${formatMs(metrics.tbt)} |`);
   if (metrics.cls !== null) lines.push(`| CLS | ${String(metrics.cls)} |`);
@@ -205,7 +233,7 @@ function renderMarkdownReport(report: AuditReport): string {
   const allCategories = report.pages.flatMap((p) => p.categories);
   const allFindings = report.pages.flatMap((p) => p.findings);
   const hasPerf = report.meta.checks_run.includes("perf");
-  const metrics = report.pages[0]?.metrics;
+  const firstPage = report.pages[0];
 
   const sections = [
     renderTitle(report),
@@ -216,8 +244,8 @@ function renderMarkdownReport(report: AuditReport): string {
     renderFindings(allFindings),
   ];
 
-  if (hasPerf && metrics) {
-    sections.push(renderMetrics(metrics));
+  if (hasPerf && firstPage) {
+    sections.push(renderMetrics(firstPage.metrics));
   }
 
   sections.push(renderMeta(report));

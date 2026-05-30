@@ -54,7 +54,8 @@ function extractWcag(tags: string[]): string | null {
 }
 
 function sanitizeSelector(selector: string): string {
-  return selector.replaceAll(/[<>]/g, "").slice(0, 200);
+  // Remove <, >, and ` -- they would break markdown tags and inline code spans.
+  return selector.replaceAll(/[<>`]/g, "").slice(0, 200);
 }
 
 function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Finding[] {
@@ -156,5 +157,5 @@ async function runAxe(page: Page, pageUrl: string): Promise<AxeRunnerResult> {
   }
 }
 
-export { runAxe, mapAxeViolationToFindings };
+export { runAxe, mapAxeViolationToFindings, sanitizeSelector };
 export type { AxeRunnerResult, AxeViolation, AxeNode };
