@@ -128,6 +128,10 @@ async function handleRun(options: RunOptions): Promise<void> {
       quiet,
       threshold,
       throttling,
+      inputMode: mode,
+      concurrency: 1, // becomes a real option in a later phase
+      perfRuns: 1, // becomes a real option in a later phase
+      sourceMaps: "auto", // becomes a real option in a later phase
     });
   } finally {
     if (server) await server.close();

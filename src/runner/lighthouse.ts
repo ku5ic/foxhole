@@ -178,9 +178,13 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
     ? entry.recommendation
     : `Review this audit in the Lighthouse documentation: ${audit.id}`;
 
+  // For numeric audits the displayValue changes every run (e.g. "480 ms" vs "560 ms").
+  // Use the stable title so the ID does not change when the measured value shifts.
+  const fingerprintDetail =
+    scoreDisplayMode === "numeric" ? audit.title : (audit.displayValue ?? audit.title);
   const textFingerprint = buildTextFingerprint({
     ruleId: audit.id,
-    detail: audit.displayValue ?? audit.title,
+    detail: fingerprintDetail,
   });
   const id = computeFindingId({ pageUrl, ruleId, semanticPath: "", textFingerprint });
 

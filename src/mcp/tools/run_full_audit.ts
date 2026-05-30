@@ -38,6 +38,10 @@ const runFullAuditTool = {
       quiet: true,
       threshold: input.threshold,
       throttling: "none",
+      inputMode: "url",
+      concurrency: 1,
+      perfRuns: 1,
+      sourceMaps: "auto",
     });
     return JSON.stringify(report);
   },

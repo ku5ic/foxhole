@@ -214,6 +214,19 @@ describe("mapLighthouseAuditToFinding - ID stability", () => {
     expect(a?.id).toBe(b?.id);
   });
 
+  it("produces the same ID for a numeric audit even when displayValue changes between runs", () => {
+    const base = makeAudit({ scoreDisplayMode: "numeric", score: 0.4 });
+    const runA = mapLighthouseAuditToFinding(
+      { ...base, displayValue: "Potential savings of 480 ms" },
+      PAGE_URL,
+    );
+    const runB = mapLighthouseAuditToFinding(
+      { ...base, displayValue: "Potential savings of 560 ms" },
+      PAGE_URL,
+    );
+    expect(runA?.id).toBe(runB?.id);
+  });
+
   it("produces different IDs for the same audit on different pages", () => {
     const audit = makeAudit({ id: "render-blocking-resources", score: 0.4 });
     const a = mapLighthouseAuditToFinding(audit, "https://example.com/a");

@@ -61,7 +61,9 @@ function buildBundleFindings(
         pageUrl,
         ruleId,
         semanticPath: "",
-        textFingerprint: buildTextFingerprint({ ruleId, detail }),
+        // Empty detail: ruleId + pageUrl already uniquely identify this single-instance finding.
+        // Passing the measured KB would make the ID change across runs.
+        textFingerprint: buildTextFingerprint({ ruleId, detail: "" }),
       }),
       category: "bundle",
       severity: entry?.default_severity ?? "major",
@@ -120,7 +122,8 @@ function buildBundleFindings(
         pageUrl,
         ruleId,
         semanticPath: "",
-        textFingerprint: buildTextFingerprint({ ruleId, detail }),
+        // Empty detail: ruleId + pageUrl already uniquely identify this single-instance finding.
+        textFingerprint: buildTextFingerprint({ ruleId, detail: "" }),
       }),
       category: "bundle",
       severity: entry?.default_severity ?? "minor",

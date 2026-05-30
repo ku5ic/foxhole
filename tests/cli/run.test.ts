@@ -132,6 +132,34 @@ describe("handleRun --build lifecycle", () => {
   });
 });
 
+describe("handleRun inputMode", () => {
+  it("passes inputMode: 'build' to buildAuditReport when --build is set", async () => {
+    const close = vi.fn(() => Promise.resolve());
+    vi.mocked(serveStaticBuild).mockResolvedValue({ url: "http://localhost:1234", close });
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ build: "./dist", urls: "/index.html" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ inputMode: "build" }));
+  });
+
+  it("passes inputMode: 'url' to buildAuditReport when --url is set", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ url: "https://example.com" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ inputMode: "url" }));
+  });
+
+  it("passes inputMode: 'urls' to buildAuditReport when --urls is set without --build", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ urls: "https://example.com,https://example.com/about" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ inputMode: "urls" }));
+  });
+});
+
 describe("handleRun --throttling", () => {
   it("passes desktop throttling preset to buildAuditReport", async () => {
     vi.mocked(buildAuditReport).mockResolvedValue(makeReport());

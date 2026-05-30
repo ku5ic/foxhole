@@ -79,6 +79,22 @@ describe("total-js-size rule", () => {
     expect(a?.id).toHaveLength(16);
     expect(a?.id).toMatch(/^[0-9a-f]{16}$/);
   });
+
+  it("produces the same ID even when the measured total changes between runs", () => {
+    const run1 = buildBundleFindings(
+      [jsResource("https://example.com/a.js", 600 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    ).find((f) => f.rule_id === "bundle/total-js-size");
+    const run2 = buildBundleFindings(
+      [jsResource("https://example.com/a.js", 700 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    ).find((f) => f.rule_id === "bundle/total-js-size");
+    expect(run1?.id).toBe(run2?.id);
+  });
 });
 
 describe("large-javascript-chunk rule", () => {
@@ -199,6 +215,22 @@ describe("total-css-size rule", () => {
       (f) => f.rule_id === "bundle/total-css-size",
     );
     expect(a?.id).toBe(b?.id);
+  });
+
+  it("produces the same ID even when the measured total changes between runs", () => {
+    const run1 = buildBundleFindings(
+      [],
+      [cssResource("https://example.com/a.css", 150 * KB)],
+      [],
+      PAGE_URL,
+    ).find((f) => f.rule_id === "bundle/total-css-size");
+    const run2 = buildBundleFindings(
+      [],
+      [cssResource("https://example.com/a.css", 200 * KB)],
+      [],
+      PAGE_URL,
+    ).find((f) => f.rule_id === "bundle/total-css-size");
+    expect(run1?.id).toBe(run2?.id);
   });
 });
 
