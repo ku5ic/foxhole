@@ -7,6 +7,7 @@ import type { ThrottlingPreset } from "../runner/index.js";
 import { scorePage, scoreReport } from "./score.js";
 import { prioritizeFindings } from "./prioritize.js";
 import { summarizeReport } from "./summarize.js";
+import { validateUrl } from "../config/validate.js";
 import type { AuditReport, CheckCategory, InputMode } from "../types/index.js";
 
 interface BuildAuditOptions {
@@ -44,6 +45,10 @@ function readDependencyVersion(name: string): string {
 }
 
 async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport> {
+  for (const url of options.urls) {
+    validateUrl(url);
+  }
+
   const startTime = Date.now();
 
   const rawPages = await runAudit({

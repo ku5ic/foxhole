@@ -2,22 +2,17 @@ import fs from "node:fs/promises";
 
 import type { Command } from "commander";
 
-import { FoxholeError } from "../../errors.js";
+import { ConfigError, FoxholeError } from "../../errors.js";
 import { loadConfig } from "../../config/load.js";
-import { DEFAULT_CHECKS, DEFAULT_THROTTLING } from "../../config/defaults.js";
-import type { ThrottlingPreset } from "../../runner/index.js";
+import { resolveRunOptions } from "../../config/resolve-options.js";
 import { buildAuditReport } from "../../audit/index.js";
 import { renderMarkdownReport } from "../../report/markdown.js";
 import { serveStaticBuild } from "../../server/static.js";
 import type { StaticServer } from "../../server/static.js";
 import type { RunOptions } from "../options.js";
-import type { AuditReport, CheckCategory } from "../../types/index.js";
+import type { AuditReport } from "../../types/index.js";
 
 type InputMode = "url" | "urls" | "build";
-
-function parseChecks(input: string): CheckCategory[] {
-  return input.split(",").map((s) => s.trim()) as CheckCategory[];
-}
 
 function validateInputMode(options: RunOptions): InputMode {
   const hasUrl = options.url !== undefined;
@@ -69,7 +64,7 @@ function registerRunCommand(program: Command): void {
     .option("--urls <urls>", "comma-separated list of URLs")
     .option("--build <path>", "path to static build directory")
     .option("--checks <checks>", "comma-separated checks: perf,a11y,semantic,bundle")
-    .option("--output <format>", "output format: json or markdown", "markdown")
+    .option("--output <format>", "output format: json or markdown")
     .option("--out <path>", "file path for output")
     .option("--config <path>", "path to foxhole.config.json")
     .option("--threshold <n>", "fail if score drops below this value", Number.parseFloat)
@@ -94,23 +89,19 @@ async function handleRun(options: RunOptions): Promise<void> {
 
   const config = options.config ? await loadConfig(options.config) : undefined;
 
-  const checks: CheckCategory[] = options.checks
-    ? parseChecks(options.checks)
-    : (config?.checks ?? DEFAULT_CHECKS);
-
-  const threshold = options.threshold ?? config?.threshold;
-  const outputFormat = options.output ?? config?.output ?? "markdown";
-  const quiet = options.quiet ?? false;
-
-  const rawThrottling = options.throttling ?? config?.throttling ?? DEFAULT_THROTTLING;
-  const VALID_THROTTLING = ["desktop", "mobile", "none"] as const;
-  if (!VALID_THROTTLING.includes(rawThrottling as ThrottlingPreset)) {
-    process.stderr.write(
-      `Error: --throttling must be one of: desktop, mobile, none (got "${rawThrottling}")\n`,
-    );
-    process.exit(2);
+  let resolved;
+  try {
+    resolved = resolveRunOptions(options, config);
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      process.stderr.write(`Error: ${error.message}\n`);
+      process.exit(2);
+    }
+    throw error;
   }
-  const throttling = rawThrottling as ThrottlingPreset;
+
+  const { checks, threshold, outputFormat, throttling, out } = resolved;
+  const quiet = options.quiet ?? false;
 
   let server: StaticServer | null = null;
   let report: AuditReport;
@@ -140,8 +131,8 @@ async function handleRun(options: RunOptions): Promise<void> {
   const content =
     outputFormat === "json" ? JSON.stringify(report, null, 2) : renderMarkdownReport(report);
 
-  if (options.out) {
-    await fs.writeFile(options.out, content, "utf8");
+  if (out) {
+    await fs.writeFile(out, content, "utf8");
   } else {
     process.stdout.write(content);
   }
