@@ -1,12 +1,19 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
+import { formatErrorChain } from "../errors.js";
 import { runFullAuditTool } from "./tools/run_full_audit.js";
 import { runAccessibilityAuditTool } from "./tools/run_accessibility_audit.js";
 import { runPerformanceAuditTool } from "./tools/run_performance_audit.js";
 import { getPrioritizedFixesTool } from "./tools/get_prioritized_fixes.js";
 import { compareRunsTool } from "./tools/compare_runs.js";
 import { generateReportTool } from "./tools/generate_report.js";
+
+function errorResult(error: unknown): { content: [{ type: "text"; text: string }] } {
+  return {
+    content: [{ type: "text", text: JSON.stringify({ error: formatErrorChain(error) }) }],
+  };
+}
 
 function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -21,8 +28,12 @@ function createMcpServer(): McpServer {
       inputSchema: runFullAuditTool.inputSchema.shape,
     },
     async (params) => {
-      const result = await runFullAuditTool.handler(params);
-      return { content: [{ type: "text", text: result }] };
+      try {
+        const result = await runFullAuditTool.handler(params);
+        return { content: [{ type: "text", text: result }] };
+      } catch (error) {
+        return errorResult(error);
+      }
     },
   );
 
@@ -33,8 +44,12 @@ function createMcpServer(): McpServer {
       inputSchema: runAccessibilityAuditTool.inputSchema.shape,
     },
     async (params) => {
-      const result = await runAccessibilityAuditTool.handler(params);
-      return { content: [{ type: "text", text: result }] };
+      try {
+        const result = await runAccessibilityAuditTool.handler(params);
+        return { content: [{ type: "text", text: result }] };
+      } catch (error) {
+        return errorResult(error);
+      }
     },
   );
 
@@ -45,8 +60,12 @@ function createMcpServer(): McpServer {
       inputSchema: runPerformanceAuditTool.inputSchema.shape,
     },
     async (params) => {
-      const result = await runPerformanceAuditTool.handler(params);
-      return { content: [{ type: "text", text: result }] };
+      try {
+        const result = await runPerformanceAuditTool.handler(params);
+        return { content: [{ type: "text", text: result }] };
+      } catch (error) {
+        return errorResult(error);
+      }
     },
   );
 
@@ -57,8 +76,12 @@ function createMcpServer(): McpServer {
       inputSchema: getPrioritizedFixesTool.inputSchema.shape,
     },
     (params) => {
-      const result = getPrioritizedFixesTool.handler(params);
-      return { content: [{ type: "text", text: result }] };
+      try {
+        const result = getPrioritizedFixesTool.handler(params);
+        return { content: [{ type: "text", text: result }] };
+      } catch (error) {
+        return errorResult(error);
+      }
     },
   );
 
@@ -69,8 +92,12 @@ function createMcpServer(): McpServer {
       inputSchema: compareRunsTool.inputSchema.shape,
     },
     (params) => {
-      const result = compareRunsTool.handler(params);
-      return { content: [{ type: "text", text: result }] };
+      try {
+        const result = compareRunsTool.handler(params);
+        return { content: [{ type: "text", text: result }] };
+      } catch (error) {
+        return errorResult(error);
+      }
     },
   );
 
@@ -81,8 +108,12 @@ function createMcpServer(): McpServer {
       inputSchema: generateReportTool.inputSchema.shape,
     },
     (params) => {
-      const result = generateReportTool.handler(params);
-      return { content: [{ type: "text", text: result }] };
+      try {
+        const result = generateReportTool.handler(params);
+        return { content: [{ type: "text", text: result }] };
+      } catch (error) {
+        return errorResult(error);
+      }
     },
   );
 

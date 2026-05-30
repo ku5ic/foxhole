@@ -198,3 +198,35 @@ describe("handleRun --throttling", () => {
     );
   });
 });
+
+describe("handleRun resolver validation", () => {
+  it("exits with code 2 for an invalid --checks value", async () => {
+    await expect(
+      handleRun({ url: "https://example.com", checks: "a11y,notacheck" }),
+    ).rejects.toMatchObject({ code: 2 });
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("notacheck"));
+  });
+
+  it("exits with code 2 for a NaN --threshold", async () => {
+    await expect(
+      handleRun({ url: "https://example.com", threshold: Number.NaN }),
+    ).rejects.toMatchObject({ code: 2 });
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("threshold"));
+  });
+
+  it("exits with code 2 for an out-of-range --threshold", async () => {
+    await expect(handleRun({ url: "https://example.com", threshold: 150 })).rejects.toMatchObject({
+      code: 2,
+    });
+  });
+
+  it("passes checks from --checks flag to buildAuditReport", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ url: "https://example.com", checks: "a11y,perf" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(
+      expect.objectContaining({ checks: ["a11y", "perf"] }),
+    );
+  });
+});

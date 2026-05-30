@@ -55,4 +55,9 @@ describe("foxholeConfigSchema", () => {
     const result = foxholeConfigSchema.safeParse({ output: "pdf" });
     expect(result.success).toBe(false);
   });
+
+  it("rejects an unknown key (strict mode)", () => {
+    const result = foxholeConfigSchema.safeParse({ threshold: 80, unknownKey: true });
+    expect(result.success).toBe(false);
+  });
 });
