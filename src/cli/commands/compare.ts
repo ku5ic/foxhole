@@ -1,25 +1,8 @@
-import fs from "node:fs/promises";
-
 import type { Command } from "commander";
 
-import { ConfigError, FoxholeError } from "../../errors.js";
+import { FoxholeError, formatErrorChain } from "../../errors.js";
+import { readAuditReport } from "../../audit/read-report.js";
 import { diffReports } from "../../audit/diff.js";
-import type { AuditReport } from "../../types/index.js";
-
-async function readAuditFile(filePath: string): Promise<AuditReport> {
-  let raw: string;
-  try {
-    raw = await fs.readFile(filePath, "utf8");
-  } catch (cause) {
-    throw new ConfigError(`Audit file not found: ${filePath}`, cause);
-  }
-
-  try {
-    return JSON.parse(raw) as AuditReport;
-  } catch (cause) {
-    throw new ConfigError(`Failed to parse audit file: ${filePath}`, cause);
-  }
-}
 
 function registerCompareCommand(program: Command): void {
   program
@@ -29,8 +12,8 @@ function registerCompareCommand(program: Command): void {
     .argument("<after>", "path to the new audit JSON file")
     .action(async (beforePath: string, afterPath: string) => {
       try {
-        const before = await readAuditFile(beforePath);
-        const after = await readAuditFile(afterPath);
+        const before = await readAuditReport(beforePath);
+        const after = await readAuditReport(afterPath);
         const diff = diffReports(before, after);
         process.stdout.write(JSON.stringify(diff, null, 2));
       } catch (error) {
@@ -38,7 +21,7 @@ function registerCompareCommand(program: Command): void {
           process.stderr.write(`Error: ${error.message}\n`);
           process.exit(2);
         }
-        process.stderr.write("Unexpected error. Please report this as a bug.\n");
+        process.stderr.write(`Unexpected error: ${formatErrorChain(error)}\n`);
         process.exit(2);
       }
     });

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { runAudit } from "../../src/runner/index.js";
+import { runAudit, runWithConcurrency } from "../../src/runner/index.js";
 import { createBrowser, createPage } from "../../src/runner/browser.js";
 import { runAxe } from "../../src/runner/axe.js";
+import { runLighthouse } from "../../src/runner/lighthouse.js";
 import { runSemanticChecks } from "../../src/runner/semantic.js";
 import { RunnerError } from "../../src/errors.js";
 
@@ -50,6 +51,11 @@ interface FakeBrowser {
   close: ReturnType<typeof vi.fn>;
 }
 
+interface FakeBrowserServer {
+  wsEndpoint: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+}
+
 function makeFakePage(): FakePage {
   return {
     goto: vi.fn(() => Promise.resolve()),
@@ -59,6 +65,13 @@ function makeFakePage(): FakePage {
 
 function makeFakeBrowser(): FakeBrowser {
   return {
+    close: vi.fn(() => Promise.resolve()),
+  };
+}
+
+function makeFakeBrowserServer(): FakeBrowserServer {
+  return {
+    wsEndpoint: vi.fn(() => "ws://127.0.0.1:9222/devtools/browser/test"),
     close: vi.fn(() => Promise.resolve()),
   };
 }
@@ -77,6 +90,7 @@ describe("runAudit - navigation failure", () => {
       urls: ["https://example.com/a"],
       checks: ["a11y", "perf"],
       quiet: true,
+      concurrency: 1,
     });
 
     expect(results).toHaveLength(1);
@@ -102,12 +116,17 @@ describe("runAudit - navigation failure", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.mocked(createBrowser)
       .mockRejectedValueOnce(new RunnerError("Failed to launch browser"))
-      .mockResolvedValueOnce(makeFakeBrowser() as never);
+      .mockResolvedValueOnce({
+        browser: makeFakeBrowser() as never,
+        server: makeFakeBrowserServer() as never,
+        cdpPort: 9222,
+      });
 
     const results = await runAudit({
       urls: ["https://example.com/a", "https://example.com/b"],
       checks: ["a11y"],
       quiet: true,
+      concurrency: 1,
     });
 
     expect(results).toHaveLength(2);
@@ -125,6 +144,7 @@ describe("runAudit - navigation failure", () => {
       urls: ["a", "b", "c"],
       checks: ["semantic"],
       quiet: true,
+      concurrency: 1,
     });
 
     expect(results).toHaveLength(3);
@@ -140,6 +160,7 @@ describe("runAudit - navigation failure", () => {
         urls: ["https://example.com/a"],
         checks: ["a11y"],
         quiet: true,
+        concurrency: 1,
       }),
     ).rejects.toBeInstanceOf(TypeError);
   });
@@ -147,7 +168,11 @@ describe("runAudit - navigation failure", () => {
 
 describe("runAudit - per-category error isolation", () => {
   beforeEach(() => {
-    vi.mocked(createBrowser).mockResolvedValue(makeFakeBrowser() as never);
+    vi.mocked(createBrowser).mockResolvedValue({
+      browser: makeFakeBrowser() as never,
+      server: makeFakeBrowserServer() as never,
+      cdpPort: 9222,
+    });
   });
 
   it("produces an errored category for the failed runner and keeps page status ok", async () => {
@@ -158,6 +183,7 @@ describe("runAudit - per-category error isolation", () => {
       urls: ["https://example.com"],
       checks: ["a11y", "semantic"],
       quiet: true,
+      concurrency: 1,
     });
 
     expect(results).toHaveLength(1);
@@ -196,6 +222,7 @@ describe("runAudit - per-category error isolation", () => {
       urls: ["https://example.com"],
       checks: ["a11y", "semantic"],
       quiet: true,
+      concurrency: 1,
     });
 
     expect(results[0]?.findings).toHaveLength(1);
@@ -211,6 +238,7 @@ describe("runAudit - per-category error isolation", () => {
       urls: ["https://example.com"],
       checks: ["a11y", "semantic"],
       quiet: true,
+      concurrency: 1,
     });
 
     expect(results[0]?.status).toBe("ok");
@@ -221,7 +249,11 @@ describe("runAudit - per-category error isolation", () => {
 
 describe("runAudit - duration_ms", () => {
   beforeEach(() => {
-    vi.mocked(createBrowser).mockResolvedValue(makeFakeBrowser() as never);
+    vi.mocked(createBrowser).mockResolvedValue({
+      browser: makeFakeBrowser() as never,
+      server: makeFakeBrowserServer() as never,
+      cdpPort: 9222,
+    });
   });
 
   it("populates duration_ms as a non-negative integer on a successful page", async () => {
@@ -229,6 +261,7 @@ describe("runAudit - duration_ms", () => {
       urls: ["https://example.com"],
       checks: ["a11y"],
       quiet: true,
+      concurrency: 1,
     });
 
     expect(results[0]?.duration_ms).toBeGreaterThanOrEqual(0);
@@ -243,9 +276,130 @@ describe("runAudit - duration_ms", () => {
       urls: ["https://example.com"],
       checks: ["a11y"],
       quiet: true,
+      concurrency: 1,
     });
 
     expect(results[0]?.duration_ms).toBeGreaterThanOrEqual(0);
     expect(Number.isInteger(results[0]?.duration_ms)).toBe(true);
+  });
+});
+
+describe("runAudit - perf-noise warning", () => {
+  beforeEach(() => {
+    vi.mocked(createBrowser).mockResolvedValue({
+      browser: makeFakeBrowser() as never,
+      server: makeFakeBrowserServer() as never,
+      cdpPort: 9222,
+    });
+  });
+
+  it("emits the perf-noise warning when concurrency > 1 and perf is checked", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await runAudit({
+      urls: ["https://example.com/a", "https://example.com/b"],
+      checks: ["perf", "a11y"],
+      quiet: true,
+      concurrency: 2,
+    });
+
+    expect(stderr).toHaveBeenCalledWith(
+      expect.stringContaining("--concurrency > 1 with perf checks"),
+    );
+  });
+
+  it("does not emit the warning when concurrency is 1", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await runAudit({
+      urls: ["https://example.com"],
+      checks: ["perf"],
+      quiet: true,
+      concurrency: 1,
+    });
+
+    const perfWarningCalls = stderr.mock.calls.filter((args) =>
+      String(args[0]).includes("--concurrency > 1"),
+    );
+    expect(perfWarningCalls).toHaveLength(0);
+  });
+
+  it("does not emit the warning when concurrency > 1 but perf is not checked", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await runAudit({
+      urls: ["https://example.com/a", "https://example.com/b"],
+      checks: ["a11y"],
+      quiet: true,
+      concurrency: 2,
+    });
+
+    const perfWarningCalls = stderr.mock.calls.filter((args) =>
+      String(args[0]).includes("--concurrency > 1"),
+    );
+    expect(perfWarningCalls).toHaveLength(0);
+  });
+
+  it("passes cdpPort from createBrowser to runLighthouse", async () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await runAudit({
+      urls: ["https://example.com"],
+      checks: ["perf"],
+      quiet: true,
+      throttling: "desktop",
+      concurrency: 1,
+    });
+
+    expect(vi.mocked(runLighthouse)).toHaveBeenCalledWith("https://example.com", 9222, "desktop");
+  });
+});
+
+describe("runWithConcurrency", () => {
+  it("returns results in input order regardless of completion order", async () => {
+    const delays = [30, 10, 20];
+    const urls = ["a", "b", "c"];
+    const results = await runWithConcurrency(urls, 3, async (url) => {
+      const delay = delays[urls.indexOf(url)] ?? 0;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return url;
+    });
+    expect(results).toEqual(["a", "b", "c"]);
+  });
+
+  it("limits in-flight work to the concurrency cap", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const urls = ["a", "b", "c", "d", "e"];
+
+    await runWithConcurrency(urls, 2, async (url) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      inFlight--;
+      return url;
+    });
+
+    expect(maxInFlight).toBeLessThanOrEqual(2);
+  });
+
+  it("returns an empty array for an empty URL list", async () => {
+    const results = await runWithConcurrency([], 3, (url) => Promise.resolve(url));
+    expect(results).toEqual([]);
+  });
+
+  it("uses fewer workers than concurrency when there are fewer URLs", async () => {
+    let peakInFlight = 0;
+    let inFlight = 0;
+    const urls = ["a"];
+
+    await runWithConcurrency(urls, 5, (url) => {
+      inFlight++;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      inFlight--;
+      return Promise.resolve(url);
+    });
+
+    expect(peakInFlight).toBe(1);
   });
 });

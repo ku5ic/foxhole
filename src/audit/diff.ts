@@ -36,7 +36,7 @@ function computeMetricsDelta(
     const beforeVal = before[key];
     const afterVal = after[key];
     if (beforeVal !== null && afterVal !== null) {
-      (delta as Record<string, number>)[key] = afterVal - beforeVal;
+      (delta as Partial<Record<keyof PerformanceMetrics, number>>)[key] = afterVal - beforeVal;
     }
   }
 
@@ -73,34 +73,22 @@ function computeComparability(
   return { comparable: notes.length === 0, notes };
 }
 
-function averageMetrics(report: AuditReport): PerformanceMetrics {
-  if (report.pages.length === 0) {
-    return {
-      lcp: null,
-      fid: null,
-      cls: null,
-      fcp: null,
-      ttfb: null,
-      tbt: null,
-      performance_score: null,
-      accessibility_score: null,
-      bundle_size: null,
-    };
-  }
-  // Use the first page metrics for simplicity in diff
-  return (
-    report.pages[0]?.metrics ?? {
-      lcp: null,
-      fid: null,
-      cls: null,
-      fcp: null,
-      ttfb: null,
-      tbt: null,
-      performance_score: null,
-      accessibility_score: null,
-      bundle_size: null,
-    }
-  );
+const NULL_METRICS: PerformanceMetrics = {
+  lcp: null,
+  fid: null,
+  cls: null,
+  fcp: null,
+  ttfb: null,
+  tbt: null,
+  performance_score: null,
+  accessibility_score: null,
+  bundle_size: null,
+};
+
+// Uses first-page metrics for the diff. For multi-page reports this is a simplification;
+// a true average across pages is deferred until perf averaging is properly specced.
+function firstPageMetrics(report: AuditReport): PerformanceMetrics {
+  return report.pages[0]?.metrics ?? NULL_METRICS;
 }
 
 function diffReports(before: AuditReport, after: AuditReport): RunDiff {
@@ -126,7 +114,7 @@ function diffReports(before: AuditReport, after: AuditReport): RunDiff {
     }
   }
 
-  const metricsDelta = computeMetricsDelta(averageMetrics(before), averageMetrics(after));
+  const metricsDelta = computeMetricsDelta(firstPageMetrics(before), firstPageMetrics(after));
 
   const beforeMeta: RunMetaSnapshot = {
     foxhole_version: before.meta.foxhole_version,

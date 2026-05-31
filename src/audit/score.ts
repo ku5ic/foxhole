@@ -1,32 +1,22 @@
 import type { CheckCategory, CategorySummary, Finding, PageResult } from "../types/index.js";
 
-const CRITICAL_PENALTY = 15;
-const MAJOR_PENALTY = 8;
-const MINOR_PENALTY = 2;
+// Severity weights for the exponential decay scoring model (see docs/decisions/ADR-010.md).
+// Ratios are intentional: critical is 2.5x major and 10x minor.
+const SEVERITY_WEIGHTS = {
+  critical: 10,
+  major: 4,
+  minor: 1,
+} as const;
+
+// Decay scale: controls how steeply additional findings lower the score.
+// With SCORE_SCALE=40: one critical -> 78, five criticals -> 29, ten criticals -> 8.
+const SCORE_SCALE = 40;
 
 const ALL_CATEGORIES: CheckCategory[] = ["a11y", "perf", "semantic", "bundle"];
 
-function scoreFindings(findings: Finding[]): number {
-  let score = 100;
-
-  for (const finding of findings) {
-    switch (finding.severity) {
-      case "critical": {
-        score -= CRITICAL_PENALTY;
-        break;
-      }
-      case "major": {
-        score -= MAJOR_PENALTY;
-        break;
-      }
-      case "minor": {
-        score -= MINOR_PENALTY;
-        break;
-      }
-    }
-  }
-
-  return Math.max(0, score);
+function scoreFromFindings(findings: Finding[]): number {
+  const load = findings.reduce((sum, f) => sum + SEVERITY_WEIGHTS[f.severity], 0);
+  return Math.round(100 * Math.exp(-load / SCORE_SCALE));
 }
 
 function buildCategorySummary(category: CheckCategory, findings: Finding[]): CategorySummary {
@@ -35,7 +25,7 @@ function buildCategorySummary(category: CheckCategory, findings: Finding[]): Cat
     category,
     status: "ok",
     error: null,
-    score: scoreFindings(categoryFindings),
+    score: scoreFromFindings(categoryFindings),
     findings_count: categoryFindings.length,
     critical_count: categoryFindings.filter((f) => f.severity === "critical").length,
     major_count: categoryFindings.filter((f) => f.severity === "major").length,
@@ -71,9 +61,11 @@ function scorePage(
     return buildCategorySummary(cat, pageResult.findings);
   });
 
-  const okScores = categories.filter((c) => c.status === "ok").map((c) => c.score);
-  const score =
-    okScores.length > 0 ? Math.round(okScores.reduce((sum, s) => sum + s, 0) / okScores.length) : 0;
+  const hasAnyOkCategory = categories.some((c) => c.status === "ok");
+  // Page score is computed from ALL findings on the page, not the mean of category scores.
+  // This eliminates empty-category inflation: a page with one critical scores 78 regardless
+  // of how many categories ran clean. See ADR-010.
+  const score = hasAnyOkCategory ? scoreFromFindings(pageResult.findings) : 0;
 
   return {
     ...pageResult,
@@ -90,4 +82,4 @@ function scoreReport(pages: PageResult[]): number {
   return Math.round(total / okPages.length);
 }
 
-export { scoreFindings, scorePage, scoreReport };
+export { scoreFromFindings, scorePage, scoreReport };

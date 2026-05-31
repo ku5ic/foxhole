@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildBundleFindings,
+  hasPathExtension,
+  measureResourceSize,
   sanitizeResourceUrl,
   type ResourceInfo,
 } from "../../src/runner/bundle.js";
@@ -10,6 +12,16 @@ const PAGE_URL = "https://example.com";
 
 const KB = 1024;
 const MB = 1024 * KB;
+
+function makeResponse(
+  headerMap: Record<string, string>,
+  bodyBytes: number,
+): { headers: () => Record<string, string>; body: () => Promise<Buffer> } {
+  return {
+    headers: (): Record<string, string> => headerMap,
+    body: (): Promise<Buffer> => Promise.resolve(Buffer.alloc(bodyBytes)),
+  };
+}
 
 function jsResource(url: string, sizeBytes: number): ResourceInfo {
   return { url, size: sizeBytes };
@@ -78,6 +90,22 @@ describe("total-js-size rule", () => {
     expect(a?.id).toBe(b?.id);
     expect(a?.id).toHaveLength(16);
     expect(a?.id).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it("produces the same ID even when the measured total changes between runs", () => {
+    const run1 = buildBundleFindings(
+      [jsResource("https://example.com/a.js", 600 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    ).find((f) => f.rule_id === "bundle/total-js-size");
+    const run2 = buildBundleFindings(
+      [jsResource("https://example.com/a.js", 700 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    ).find((f) => f.rule_id === "bundle/total-js-size");
+    expect(run1?.id).toBe(run2?.id);
   });
 });
 
@@ -200,6 +228,22 @@ describe("total-css-size rule", () => {
     );
     expect(a?.id).toBe(b?.id);
   });
+
+  it("produces the same ID even when the measured total changes between runs", () => {
+    const run1 = buildBundleFindings(
+      [],
+      [cssResource("https://example.com/a.css", 150 * KB)],
+      [],
+      PAGE_URL,
+    ).find((f) => f.rule_id === "bundle/total-css-size");
+    const run2 = buildBundleFindings(
+      [],
+      [cssResource("https://example.com/a.css", 200 * KB)],
+      [],
+      PAGE_URL,
+    ).find((f) => f.rule_id === "bundle/total-css-size");
+    expect(run1?.id).toBe(run2?.id);
+  });
 });
 
 describe("insecure-resource rule", () => {
@@ -272,6 +316,55 @@ describe("sanitizeResourceUrl", () => {
 
   it("handles non-parseable URLs without throwing", () => {
     expect(() => sanitizeResourceUrl("not-a-url")).not.toThrow();
+  });
+});
+
+describe("hasPathExtension (BUN-2)", () => {
+  it("detects .js extension in a clean URL", () => {
+    expect(hasPathExtension("https://example.com/main.js", ".js")).toBe(true);
+  });
+
+  it("ignores .js in query string -- uses pathname only", () => {
+    expect(hasPathExtension("https://example.com/loader?bundle=main.js", ".js")).toBe(false);
+  });
+
+  it("detects .css extension in a URL with query params", () => {
+    expect(hasPathExtension("https://example.com/style.css?v=1234", ".css")).toBe(true);
+  });
+
+  it("returns false for a non-matching extension", () => {
+    expect(hasPathExtension("https://example.com/image.png", ".js")).toBe(false);
+  });
+
+  it("handles non-parseable URLs without throwing", () => {
+    expect(() => hasPathExtension("not-a-url.js", ".js")).not.toThrow();
+  });
+});
+
+describe("measureResourceSize", () => {
+  it("returns Content-Length value for an uncompressed response (no encoding header)", async () => {
+    const response = makeResponse({ "content-length": "123456" }, 0);
+    expect(await measureResourceSize(response as never)).toBe(123_456);
+  });
+
+  it("falls back to body length when Content-Length is absent", async () => {
+    const response = makeResponse({}, 200 * 1024);
+    expect(await measureResourceSize(response as never)).toBe(200 * 1024);
+  });
+
+  it("ignores Content-Length when content-encoding is present (compressed response)", async () => {
+    // Transfer size is 150 KB, decoded body is 600 KB -- the decoded size must win.
+    const response = makeResponse(
+      { "content-encoding": "gzip", "content-length": String(150 * 1024) },
+      600 * 1024,
+    );
+    expect(await measureResourceSize(response as never)).toBe(600 * 1024);
+  });
+
+  it("caps the body at MAX_BODY_BUFFER_BYTES (10 MB) when Content-Length is absent", async () => {
+    const oversized = 15 * 1024 * 1024;
+    const response = makeResponse({}, oversized);
+    expect(await measureResourceSize(response as never)).toBe(10 * 1024 * 1024);
   });
 });
 

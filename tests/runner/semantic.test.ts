@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 
 import {
   mapSemanticResultToFindings,
+  parseSemanticResults,
   type SemanticCheckResult,
 } from "../../src/runner/semantic.js";
+import { RunnerError } from "../../src/errors.js";
 
 const PAGE_URL = "https://example.com";
 
@@ -205,5 +207,35 @@ describe("ID stability", () => {
     );
     expect(finding?.id).toHaveLength(16);
     expect(finding?.id).toMatch(/^[0-9a-f]{16}$/);
+  });
+});
+
+describe("parseSemanticResults", () => {
+  const validResult = {
+    check: "missing-h1",
+    issues: [{ selector: null, detail: "Page has no h1 element", outerHTML: null }],
+  };
+
+  it("accepts a valid results array", () => {
+    const result = parseSemanticResults([validResult]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.check).toBe("missing-h1");
+  });
+
+  it("accepts an empty array", () => {
+    expect(parseSemanticResults([])).toEqual([]);
+  });
+
+  it("throws RunnerError when input is not an array", () => {
+    expect(() => parseSemanticResults("not an array")).toThrow(RunnerError);
+  });
+
+  it("throws RunnerError when a result is missing the check field", () => {
+    expect(() => parseSemanticResults([{ issues: [] }])).toThrow(RunnerError);
+  });
+
+  it("throws RunnerError when an issue is missing the detail field", () => {
+    const bad = { check: "foo", issues: [{ selector: null, outerHTML: null }] };
+    expect(() => parseSemanticResults([bad])).toThrow(RunnerError);
   });
 });

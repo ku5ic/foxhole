@@ -20,6 +20,10 @@ const runAccessibilityAuditTool = {
       checks: ["a11y"],
       quiet: true,
       throttling: "none",
+      inputMode: "url",
+      concurrency: 1,
+      perfRuns: 1,
+      sourceMaps: "auto",
     });
     const findings: Finding[] = report.pages.flatMap((p) => p.findings);
     return JSON.stringify(findings);

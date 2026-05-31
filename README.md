@@ -61,12 +61,7 @@ Options:
   --out           File path for output (default: stdout)
   --config        Path to foxhole.config.json
   --threshold     Exit with code 1 if score drops below this value (useful in CI)
-  --source-maps   Source map resolution: auto | on | off (default: auto)
-  --concurrency   Number of pages to audit in parallel (default: 1)
-  --perf-runs     Number of Lighthouse runs per page; median is reported (default: 1)
-  --perf-profile  Lighthouse throttling profile: fast | standard | mobile (default: standard)
-  --wait-for      CSS selector to wait for before running checks
-  --wait-timeout  Milliseconds to wait for navigation and selectors (default: 30000)
+  --throttling    Lighthouse throttling preset: desktop, mobile, or none (default: none)
   --quiet         Suppress progress output
 ```
 
@@ -133,7 +128,9 @@ Exit codes:
 
 ## MCP server
 
-Foxhole includes an MCP server that exposes audit capabilities as tools callable by any MCP-compatible AI agent, including Claude Code.
+> **Note:** The `foxhole mcp` command is planned for Phase 6 and is not available in the current release. The MCP tool definitions exist in the codebase but the CLI subcommand has not been wired up yet.
+
+Foxhole will include an MCP server that exposes audit capabilities as tools callable by any MCP-compatible AI agent, including Claude Code.
 
 ```bash
 foxhole mcp
@@ -244,7 +241,7 @@ foxhole run --build ./dist --urls /login,/dashboard,/settings
 - `Finding.source` is always null in this release. Source map integration (mapping bundled coordinates back to original file and line) is planned for a later phase.
 - Lighthouse and Playwright open separate Chromium instances for each page audit. They do not share a browser. This costs one additional Chromium launch per page when both `perf` and other checks are requested.
 - `--build` mode serves static files only. There is no server-side renderer and no proxy for backend API requests; pages that depend on either need to be audited against a running environment.
-- Lighthouse performance scores have inherent variance from one run to the next. Use `--perf-runs` to average multiple runs when a stable number matters.
+- Lighthouse performance scores have inherent variance from one run to the next. Running the audit multiple times and comparing results is the workaround until `--perf-runs` is implemented.
 - Bundle checks (`--checks bundle`) navigate the target page a second time in a fresh browser context to capture network responses. Pages with side effects from navigation may produce inconsistent results.
 
 ---

@@ -6,12 +6,14 @@ import { describe, it, expect, vi } from "vitest";
 
 import {
   mapLighthouseAuditToFinding,
+  parseLighthouseResults,
   extractMetrics,
   buildAuditCategoryMap,
   buildLighthouseConfig,
   type LighthouseAudit,
   type LighthouseCategory,
 } from "../../src/runner/lighthouse.js";
+import { RunnerError } from "../../src/errors.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
@@ -212,6 +214,19 @@ describe("mapLighthouseAuditToFinding - ID stability", () => {
     const a = mapLighthouseAuditToFinding(audit, PAGE_URL);
     const b = mapLighthouseAuditToFinding(audit, PAGE_URL);
     expect(a?.id).toBe(b?.id);
+  });
+
+  it("produces the same ID for a numeric audit even when displayValue changes between runs", () => {
+    const base = makeAudit({ scoreDisplayMode: "numeric", score: 0.4 });
+    const runA = mapLighthouseAuditToFinding(
+      { ...base, displayValue: "Potential savings of 480 ms" },
+      PAGE_URL,
+    );
+    const runB = mapLighthouseAuditToFinding(
+      { ...base, displayValue: "Potential savings of 560 ms" },
+      PAGE_URL,
+    );
+    expect(runA?.id).toBe(runB?.id);
   });
 
   it("produces different IDs for the same audit on different pages", () => {
@@ -426,5 +441,58 @@ describe("buildLighthouseConfig", () => {
     const config = buildLighthouseConfig("mobile");
     expect(config.screenEmulation.width).toBe(412);
     expect(config.screenEmulation.height).toBe(823);
+  });
+});
+
+describe("parseLighthouseResults", () => {
+  const validLhr = {
+    audits: {
+      "largest-contentful-paint": {
+        id: "largest-contentful-paint",
+        title: "Largest Contentful Paint",
+        description: "LCP measures...",
+        score: 0.5,
+        scoreDisplayMode: "numeric",
+        numericValue: 3200,
+      },
+    },
+    categories: {
+      performance: {
+        score: 0.6,
+        auditRefs: [{ id: "largest-contentful-paint" }],
+      },
+    },
+  };
+
+  it("accepts a valid lhr structure", () => {
+    const result = parseLighthouseResults(validLhr);
+    expect(result.audits["largest-contentful-paint"]).toBeDefined();
+    expect(result.categories.performance).toBeDefined();
+  });
+
+  it("accepts empty audits and categories records", () => {
+    const result = parseLighthouseResults({ audits: {}, categories: {} });
+    expect(result.audits).toEqual({});
+    expect(result.categories).toEqual({});
+  });
+
+  it("throws RunnerError when audits field is missing", () => {
+    expect(() => parseLighthouseResults({ categories: {} })).toThrow(RunnerError);
+  });
+
+  it("throws RunnerError when categories field is missing", () => {
+    expect(() => parseLighthouseResults({ audits: {} })).toThrow(RunnerError);
+  });
+
+  it("throws RunnerError when lhr is null", () => {
+    expect(() => parseLighthouseResults(null)).toThrow(RunnerError);
+  });
+
+  it("throws RunnerError when an audit entry is missing title", () => {
+    const bad = {
+      audits: { lcp: { id: "lcp", description: "x", score: 0.5 } },
+      categories: {},
+    };
+    expect(() => parseLighthouseResults(bad)).toThrow(RunnerError);
   });
 });

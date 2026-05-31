@@ -36,9 +36,9 @@ Does not own: scoring, prioritization, rendering, orchestration across pages. Ru
 
 Key files:
 
-- `index.ts`: exports the `Runner` interface and a registry mapping `CheckCategory` to runner implementations
+- `index.ts`: exports `runAudit`, the concurrency harness (`runWithConcurrency`), and shared types. A formal `Runner` interface and category registry are the intended design but are not yet implemented.
 - `browser.ts`: Playwright context lifecycle (launch, navigate, wait, close), shared by all runners
-- `lighthouse.ts`, `axe.ts`, `semantic.ts`, `bundle.ts`: one file per runner, each implements the `Runner` interface
+- `lighthouse.ts`, `axe.ts`, `semantic.ts`, `bundle.ts`: one file per runner, each exposes a typed async function. They do not yet implement a shared `Runner` interface.
 
 Runners depend only on `browser.ts`, the runner interface, and `types/`. They never import from `audit/`, `report/`, or `cli/`.
 
@@ -116,6 +116,8 @@ This is where `Finding`, `AuditReport`, `Runner`, `RunInput`, and every other sh
 
 The runner interface is the dependency inversion line. The orchestrator depends on this interface, not on Lighthouse, axe-core, or Playwright. Implementations are interchangeable.
 
+> **Implementation status:** The `Runner` interface, `RunnerContext`, and `RunnerResult` shapes below represent the intended design. The current implementation uses individual runner functions (`runAxe`, `runLighthouse`, `runSemanticChecks`, `runBundleChecks`) without a formal interface or registry. `RunnerContext.signal` (AbortSignal) and `RunnerContext.buildRoot` are not yet threaded through. The shapes here are the target; see section 4.4 and the runner deferred items in PHASES.md.
+
 ### 2.1 Shape
 
 ```typescript
@@ -189,9 +191,11 @@ The MCP path is identical from step 3 onward. Only the entry point differs. This
 
 ### 4.1 Single browser, single context per page
 
+> **Implementation status:** The current code creates one Playwright `BrowserServer` per page and tears it down after each page audit (see `runner/index.ts::auditSinglePage`). This is documented as a known limitation in README.md and PHASES.md. Single-browser-for-the-entire-run is the target design and is recorded as deferred work.
+
 One Playwright `Browser` instance for the entire run. One `BrowserContext` per audited URL, created fresh and torn down after the page is audited. Within a context, one `Page`.
 
-This is non-negotiable. Multiple Chrome instances is the existing tech debt item that this design closes. Tests verify only one Chromium process exists during a run.
+Multiple Chrome instances is the existing tech debt item that this design closes. Tests verify only one Chromium process exists during a run.
 
 ### 4.2 Two-pass per page
 
@@ -199,9 +203,11 @@ axe, semantic, and bundle are pure DOM and network reads. They do not interfere 
 
 The execution per page is two passes:
 
-**Pass 1 (parallel):** axe, semantic, bundle run concurrently against the loaded page. They share the same `Page` instance. Bundle analysis reads from the network log captured during the initial navigation.
+> **Implementation status:** Pass 1 currently runs sequentially (a11y, then perf, then semantic, then bundle), not in parallel. Concurrent Pass 1 execution is the target design for a later phase.
 
-**Pass 2 (sequential):** Lighthouse runs against the same `Page`. Lighthouse will trigger its own navigation and reload internally; this is acceptable because pass 1 has already completed and released its read locks on the DOM.
+**Pass 1:** axe, semantic, and bundle run against the loaded page. They share the same `Page` instance. Bundle analysis reads from the network log captured during the initial navigation. Target design is to run these concurrently.
+
+**Pass 2:** Lighthouse runs against the same `Page`. Lighthouse will trigger its own navigation and reload internally; this is acceptable because pass 1 has already completed.
 
 Pass 2 is skipped if `perf` is not in the requested checks. Pass 1 is skipped if none of axe, semantic, or bundle are requested.
 
@@ -221,6 +227,8 @@ The orchestrator emits a warning to stderr when `--concurrency > 1` and `perf` i
 
 ### 4.4 Cancellation
 
+> **Implementation status:** Cancellation via `AbortSignal` is not yet implemented. `RunnerOptions` has no `signal` field and runners accept no signal. SIGINT handling and per-page timeouts are deferred. The design below is the target.
+
 All runners receive an `AbortSignal`. The orchestrator wires the signal to:
 
 - The CLI's SIGINT handler (Ctrl+C cleanly tears down the browser)
@@ -239,9 +247,9 @@ No code outside of `src/runner/` may import from `axe-core`, `lighthouse`, or an
 
 This is enforced by:
 
-1. ESLint rule restricting imports of `axe-core` and `lighthouse` to files under `src/runner/`
-2. A unit test that asserts no `audit/`, `report/`, `mcp/`, or `cli/` file imports vendor packages
-3. Code review
+1. Code review
+
+> **Not yet implemented:** An ESLint `no-restricted-imports` rule for `axe-core`, `lighthouse`, and `playwright` outside `src/runner/`, and a unit test asserting the boundary, are the intended enforcement mechanisms but have not been configured. They are tracked as open items.
 
 ### 5.2 Where normalization lives
 
@@ -298,7 +306,7 @@ If a runner returns `status: "errored"`:
 
 - The category is marked `errored` in the report
 - The error message is included in the report (not the stack trace, that goes to stderr at debug level)
-- The overall run score is computed from successful categories only, with errored categories excluded from the average rather than counted as zero
+- The page score is computed from all findings via exponential decay (ADR-010); errored categories contribute no findings, so their absence lowers the page score only if they would have had findings
 - Exit code is 1 if the partial score still falls below threshold, 2 only if no runners completed at all
 
 If page navigation itself fails (the URL is unreachable, browser crashes mid-load):
@@ -405,7 +413,9 @@ This is a local development tool. It is not designed for hostile networks.
 
 `foxhole mcp` is a CLI subcommand. It launches the MCP server on stdio and never exits until stdin closes.
 
-The subcommand is registered in `cli/commands/mcp.ts`. It imports from `mcp/index.ts`, which sets up the `@modelcontextprotocol/sdk` server, registers tool handlers from `mcp/tools/*.ts`, and starts the stdio transport.
+> **Implementation status:** `cli/commands/mcp.ts` does not exist yet. The `foxhole mcp` subcommand has not been registered in `cli/index.ts`. `startMcpServer()` is implemented in `mcp/index.ts` but is not wired to a CLI command. This is Phase 6 work.
+
+The subcommand will be registered in `cli/commands/mcp.ts`. It imports from `mcp/index.ts`, which sets up the `@modelcontextprotocol/sdk` server, registers tool handlers from `mcp/tools/*.ts`, and starts the stdio transport.
 
 ### 9.2 Tool handlers
 
@@ -434,14 +444,19 @@ Tool calls that do not run audits (`generate_report`, `compare_runs`, `get_prior
 
 ### 10.1 Resolution sequence
 
-Implemented in `config/load.ts`. The sequence:
+The sequence is split across three locations in the current implementation:
 
-1. Start with defaults from `config/defaults.ts`
-2. Look for `foxhole.config.json` in the current working directory; if present, parse and validate, merge over defaults
-3. If `--config` is provided, parse and validate that file, merge over the cwd config (or over defaults if no cwd config existed)
-4. Merge CLI flags over the result
-5. Run final validation on the merged object
-6. Return a fully typed `ResolvedConfig`
+- `config/load.ts::loadConfig`: reads, parses, and validates a single config file path it is given. Does not discover files or merge flags.
+- `commands/run.ts::loadConfigForRun`: auto-discovers `foxhole.config.json` in the current working directory when `--config` is not set.
+- `config/resolve-options.ts::resolveRunOptions`: merges CLI flags over config values and falls back to defaults from `config/defaults.ts`.
+
+The full sequence:
+
+1. Start with defaults from `config/defaults.ts` (applied in `resolveRunOptions`)
+2. Look for `foxhole.config.json` in cwd via `loadConfigForRun`; if present, load via `loadConfig`
+3. If `--config` is provided, load that file via `loadConfig` instead
+4. Merge CLI flags over the loaded config in `resolveRunOptions`
+5. Return a fully typed `ResolvedRunOptions`
 
 Each step is a pure function. The merge is shallow at the top level; arrays (`urls`, `checks`) are replaced wholesale, not concatenated. Concatenation is surprising; replacement is predictable.
 

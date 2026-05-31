@@ -218,6 +218,131 @@ describe("renderMarkdownReport categories table", () => {
   });
 });
 
+describe("renderMarkdownReport score section", () => {
+  it("omits Pass/Fail label when threshold is null (E2)", () => {
+    const report = makeReport([makePage([okCategory()])]);
+    // makeReport sets threshold: null
+    const output = renderMarkdownReport(report);
+    expect(output).toContain("**80 / 100**");
+    expect(output).not.toContain("Pass");
+    expect(output).not.toContain("Fail");
+  });
+
+  it("shows 'Pass' when threshold is set and passed=true", () => {
+    const report: AuditReport = {
+      ...makeReport([makePage([okCategory()])]),
+      meta: {
+        ...makeReport([makePage([okCategory()])]).meta,
+        threshold: 70,
+        passed: true,
+      },
+    };
+    const output = renderMarkdownReport(report);
+    expect(output).toContain("Pass");
+  });
+
+  it("shows 'Below threshold' when threshold is set and passed=false", () => {
+    const report: AuditReport = {
+      ...makeReport([makePage([okCategory()])]),
+      meta: {
+        ...makeReport([makePage([okCategory()])]).meta,
+        threshold: 90,
+        passed: false,
+      },
+    };
+    const output = renderMarkdownReport(report);
+    expect(output).toContain("Below threshold (90)");
+  });
+
+  it("renders Lighthouse performance score when perf ran and score is non-null (E5)", () => {
+    const pageWithPerf: PageResult = {
+      ...makePage([okCategory()]),
+      metrics: {
+        ...emptyMetrics(),
+        performance_score: 73,
+      },
+    };
+    const report: AuditReport = {
+      ...makeReport([pageWithPerf]),
+      meta: {
+        ...makeReport([pageWithPerf]).meta,
+        checks_run: ["perf"],
+      },
+    };
+    const output = renderMarkdownReport(report);
+    expect(output).toContain("Lighthouse performance score: 73");
+  });
+
+  it("omits Lighthouse score line when performance_score is null", () => {
+    const report: AuditReport = {
+      ...makeReport([makePage([okCategory()])]),
+      meta: {
+        ...makeReport([makePage([okCategory()])]).meta,
+        checks_run: ["perf"],
+      },
+    };
+    const output = renderMarkdownReport(report);
+    expect(output).not.toContain("Lighthouse performance score");
+  });
+});
+
+describe("renderMarkdownReport metrics section", () => {
+  it("renders FID when non-null (E1)", () => {
+    const pageWithMetrics: PageResult = {
+      ...makePage([okCategory()]),
+      metrics: {
+        ...emptyMetrics(),
+        fid: 110,
+      },
+    };
+    const report: AuditReport = {
+      ...makeReport([pageWithMetrics]),
+      meta: {
+        ...makeReport([pageWithMetrics]).meta,
+        checks_run: ["perf"],
+      },
+    };
+    const output = renderMarkdownReport(report);
+    expect(output).toContain("| FID |");
+    expect(output).toContain("110ms");
+  });
+
+  it("omits FID row when null", () => {
+    const pageWithMetrics: PageResult = {
+      ...makePage([okCategory()]),
+      metrics: { ...emptyMetrics(), lcp: 2000 },
+    };
+    const report: AuditReport = {
+      ...makeReport([pageWithMetrics]),
+      meta: {
+        ...makeReport([pageWithMetrics]).meta,
+        checks_run: ["perf"],
+      },
+    };
+    const output = renderMarkdownReport(report);
+    expect(output).not.toContain("| FID |");
+  });
+});
+
+describe("renderMarkdownReport findings - backtick sanitization (E4)", () => {
+  it("escapes backticks in finding titles", () => {
+    const finding = makeFinding({ title: "Use `alt` attribute" });
+    const report = makeReport([makePage([okCategory()], [finding])]);
+    const output = renderMarkdownReport(report);
+    // Backtick must be escaped so it doesn't break markdown inline code in a heading
+    expect(output).toContain("\\`alt\\`");
+    expect(output).not.toMatch(/#### \[Minor\] Use `alt`/);
+  });
+
+  it("escapes backticks in finding recommendations", () => {
+    const finding = makeFinding({ recommendation: 'Add `alt=""` to decorative images.' });
+    const report = makeReport([makePage([okCategory()], [finding])]);
+    const output = renderMarkdownReport(report);
+    // Backticks escaped; regular quotes left as-is.
+    expect(output).toContain('\\`alt=""\\`');
+  });
+});
+
 describe("renderMarkdownReport findings - source location", () => {
   it("renders no source line when source is null", () => {
     const report = makeReport([makePage([okCategory()], [makeFinding({ source: null })])]);
@@ -236,5 +361,92 @@ describe("renderMarkdownReport findings - source location", () => {
     const output = renderMarkdownReport(report);
 
     expect(output).toContain("**Source:** src/components/Button.tsx:42:8");
+  });
+});
+
+describe("renderMarkdownReport - multi-page title", () => {
+  it("lists all page URLs as a bullet list when more than one page is audited", () => {
+    const pages = [
+      { ...makePage([okCategory()]), url: "https://example.com/" },
+      { ...makePage([okCategory()]), url: "https://example.com/about" },
+    ];
+    const report = makeReport(pages);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("**Pages audited (2):**");
+    expect(output).toContain("- https://example.com/");
+    expect(output).toContain("- https://example.com/about");
+    expect(output).not.toContain("**URL:**");
+  });
+
+  it("keeps the single-URL line for a one-page report", () => {
+    const report = makeReport([makePage([okCategory()])]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("**URL:** https://example.com");
+    expect(output).not.toContain("**Pages audited");
+  });
+});
+
+describe("renderMarkdownReport - multi-page categories", () => {
+  it("renders a Results by page section with a subsection per URL", () => {
+    const pages = [
+      {
+        ...makePage([okCategory({ category: "a11y", score: 95 })]),
+        url: "https://example.com/",
+        score: 95,
+      },
+      {
+        ...makePage([okCategory({ category: "bundle", score: 70 })]),
+        url: "https://example.com/about",
+        score: 70,
+      },
+    ];
+    const report = makeReport(pages);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("## Results by page");
+    expect(output).toContain("### https://example.com/ - score 95");
+    expect(output).toContain("### https://example.com/about - score 70");
+    expect(output).not.toContain("## Categories");
+  });
+
+  it("shows each page's category rows under its own heading", () => {
+    const pages = [
+      {
+        ...makePage([
+          okCategory({ category: "a11y", score: 100 }),
+          erroredCategory("Lighthouse failed", { category: "perf" }),
+        ]),
+        url: "https://example.com/",
+        score: 80,
+      },
+      {
+        ...makePage([okCategory({ category: "a11y", score: 88 })]),
+        url: "https://example.com/contact",
+        score: 88,
+      },
+    ];
+    const report = makeReport(pages);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("### https://example.com/ - score 80");
+    expect(output).toContain("| Accessibility | 100 |");
+    expect(output).toContain("| Performance | errored |");
+    expect(output).toContain("### https://example.com/contact - score 88");
+    expect(output).toContain("| Accessibility | 88 |");
+  });
+
+  it("still renders the flat Categories section for a single-page report", () => {
+    const report = makeReport([makePage([okCategory()])]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("## Categories");
+    expect(output).not.toContain("## Results by page");
   });
 });

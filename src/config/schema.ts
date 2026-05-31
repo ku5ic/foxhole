@@ -1,17 +1,21 @@
 import { z } from "zod";
 
-const foxholeConfigSchema = z.object({
-  url: z.url().optional(),
-  urls: z.array(z.string()).optional(),
-  checks: z
-    .array(z.enum(["perf", "a11y", "semantic", "bundle"]))
-    .optional()
-    .default(["perf", "a11y", "semantic", "bundle"]),
-  output: z.enum(["json", "markdown"]).optional().default("markdown"),
-  throttling: z.enum(["desktop", "mobile", "none"]).optional(),
-  out: z.string().optional(),
-  threshold: z.number().min(0).max(100).optional(),
-});
+const foxholeConfigSchema = z
+  .object({
+    url: z.url().optional(),
+    urls: z.array(z.string()).optional(),
+    checks: z
+      .array(z.enum(["perf", "a11y", "semantic", "bundle"]))
+      .optional()
+      .default(["perf", "a11y", "semantic", "bundle"]),
+    output: z.enum(["json", "markdown"]).optional().default("markdown"),
+    throttling: z.enum(["desktop", "mobile", "none"]).optional(),
+    concurrency: z.number().int().min(1).optional(),
+    out: z.string().optional(),
+    threshold: z.number().min(0).max(100).optional(),
+  })
+  // Rejects unknown keys so typos in config files surface as errors rather than silently being ignored.
+  .strict();
 
 type FoxholeConfig = z.infer<typeof foxholeConfigSchema>;
 

@@ -4,9 +4,12 @@ import readline from "node:readline";
 
 import type { Command } from "commander";
 
-const DEFAULT_CONFIG = {
-  checks: ["perf", "a11y", "semantic", "bundle"],
-  output: "markdown",
+import { formatErrorChain } from "../../errors.js";
+import { foxholeConfigSchema } from "../../config/schema.js";
+
+// Base defaults come from the schema; threshold is set to a common starting value.
+const INIT_DEFAULTS = {
+  ...foxholeConfigSchema.parse({}),
   threshold: 80,
 };
 
@@ -29,26 +32,31 @@ function registerInitCommand(program: Command): void {
     .command("init")
     .description("Create a default foxhole.config.json in the current directory")
     .action(async () => {
-      const filePath = path.resolve("foxhole.config.json");
-
-      let exists = false;
       try {
-        await fs.access(filePath);
-        exists = true;
-      } catch {
-        // file does not exist, safe to write
-      }
+        const filePath = path.resolve("foxhole.config.json");
 
-      if (exists) {
-        const confirmed = await promptOverwrite(filePath);
-        if (!confirmed) {
-          process.stderr.write("Aborted.\n");
-          return;
+        let exists = false;
+        try {
+          await fs.access(filePath);
+          exists = true;
+        } catch {
+          // file does not exist, safe to write
         }
-      }
 
-      await fs.writeFile(filePath, JSON.stringify(DEFAULT_CONFIG, null, 2) + "\n", "utf8");
-      process.stderr.write(`Created ${filePath}\n`);
+        if (exists) {
+          const confirmed = await promptOverwrite(filePath);
+          if (!confirmed) {
+            process.stderr.write("Aborted.\n");
+            return;
+          }
+        }
+
+        await fs.writeFile(filePath, JSON.stringify(INIT_DEFAULTS, null, 2) + "\n", "utf8");
+        process.stderr.write(`Created ${filePath}\n`);
+      } catch (error) {
+        process.stderr.write(`Unexpected error: ${formatErrorChain(error)}\n`);
+        process.exit(2);
+      }
     });
 }
 

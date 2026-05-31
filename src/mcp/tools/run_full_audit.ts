@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { buildAuditReport } from "../../audit/index.js";
+import { validateChecks } from "../../config/validate.js";
 import { DEFAULT_CHECKS } from "../../config/defaults.js";
-import type { CheckCategory } from "../../types/index.js";
 
 const inputSchema = z.object({
   url: z.url().optional(),
@@ -19,11 +19,6 @@ function parseUrls(input: RunFullAuditInput): string[] {
   return [];
 }
 
-function parseChecks(input: RunFullAuditInput): CheckCategory[] {
-  if (input.checks) return input.checks.split(",").map((s) => s.trim()) as CheckCategory[];
-  return [...DEFAULT_CHECKS];
-}
-
 const runFullAuditTool = {
   name: "run_full_audit",
   description:
@@ -31,13 +26,20 @@ const runFullAuditTool = {
   inputSchema,
   handler: async (input: RunFullAuditInput): Promise<string> => {
     const urls = parseUrls(input);
-    const checks = parseChecks(input);
+    const checks = input.checks
+      ? validateChecks(input.checks.split(",").map((s) => s.trim()))
+      : [...DEFAULT_CHECKS];
+    // URLs are validated by buildAuditReport via validateUrl at the audit entry point.
     const report = await buildAuditReport({
       urls,
       checks,
       quiet: true,
       threshold: input.threshold,
       throttling: "none",
+      inputMode: "url",
+      concurrency: 1,
+      perfRuns: 1,
+      sourceMaps: "auto",
     });
     return JSON.stringify(report);
   },

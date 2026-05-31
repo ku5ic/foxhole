@@ -24,14 +24,14 @@ async function serveStaticBuild(buildPath: string): Promise<StaticServer> {
       reject(new RunnerError(`Failed to start static server for ${absolutePath}`, cause));
     });
 
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const address = server.address();
       if (!address || typeof address === "string") {
         reject(new RunnerError("Static server bound to unexpected address type"));
         return;
       }
 
-      const url = `http://localhost:${String(address.port)}`;
+      const url = `http://127.0.0.1:${String(address.port)}`;
 
       const close = (): Promise<void> =>
         new Promise((resolveClose, rejectClose) => {

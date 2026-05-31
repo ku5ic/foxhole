@@ -1,8 +1,11 @@
 import type { Page } from "playwright";
 
-import { catalog } from "../catalog/index.js";
+import { z } from "zod";
+
 import { RunnerError } from "../errors.js";
+import { catalogLookup } from "./catalog-lookup.js";
 import { buildSemanticPath, buildTextFingerprint, computeFindingId } from "./finding-id.js";
+import { sanitizeSelector } from "./sanitize.js";
 import type { Finding } from "../types/index.js";
 
 interface SemanticRunnerResult {
@@ -12,6 +15,29 @@ interface SemanticRunnerResult {
 interface SemanticCheckResult {
   check: string;
   issues: { selector: string | null; detail: string; outerHTML: string | null }[];
+}
+
+const semanticIssueSchema = z.object({
+  selector: z.string().nullable(),
+  detail: z.string(),
+  outerHTML: z.string().nullable(),
+});
+
+const semanticCheckResultSchema = z.object({
+  check: z.string(),
+  issues: z.array(semanticIssueSchema),
+});
+
+const semanticResultsSchema = z.array(semanticCheckResultSchema);
+
+function parseSemanticResults(raw: unknown): SemanticCheckResult[] {
+  const result = semanticResultsSchema.safeParse(raw);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    const detail = issue ? `${issue.path.join(".") || "root"}: ${issue.message}` : "unknown";
+    throw new RunnerError(`Unexpected semantic check output shape: ${detail}`);
+  }
+  return result.data;
 }
 
 const SEMANTIC_CHECKS_SCRIPT = `(() => {
@@ -92,11 +118,7 @@ const SEMANTIC_CHECKS_SCRIPT = `(() => {
 
 function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: string): Finding[] {
   const ruleId = `semantic/${result.check}`;
-  const entry = catalog[ruleId];
-
-  if (!entry && process.env.FOXHOLE_DEBUG === "1") {
-    process.stderr.write(`[foxhole:debug] catalog gap: ruleId=${ruleId}\n`);
-  }
+  const entry = catalogLookup(ruleId);
 
   return result.issues.map((issue) => {
     const semanticPath = issue.outerHTML === null ? "" : buildSemanticPath(issue.outerHTML);
@@ -112,7 +134,7 @@ function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: strin
       title: entry ? entry.title_template : result.check,
       description: issue.detail,
       recommendation: entry ? entry.recommendation : "Review and fix the semantic issue.",
-      selector: issue.selector,
+      selector: issue.selector === null ? null : sanitizeSelector(issue.selector),
       wcag: null,
       impact: null,
       source: null,
@@ -124,7 +146,7 @@ function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: strin
 async function runSemanticChecks(page: Page, pageUrl: string): Promise<SemanticRunnerResult> {
   try {
     const rawResults: unknown = await page.evaluate(SEMANTIC_CHECKS_SCRIPT);
-    const results = rawResults as SemanticCheckResult[];
+    const results = parseSemanticResults(rawResults);
 
     const findings = results.flatMap((result) => mapSemanticResultToFindings(result, pageUrl));
 
@@ -134,5 +156,5 @@ async function runSemanticChecks(page: Page, pageUrl: string): Promise<SemanticR
   }
 }
 
-export { runSemanticChecks, mapSemanticResultToFindings };
+export { runSemanticChecks, mapSemanticResultToFindings, parseSemanticResults };
 export type { SemanticRunnerResult, SemanticCheckResult };

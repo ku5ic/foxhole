@@ -132,6 +132,34 @@ describe("handleRun --build lifecycle", () => {
   });
 });
 
+describe("handleRun inputMode", () => {
+  it("passes inputMode: 'build' to buildAuditReport when --build is set", async () => {
+    const close = vi.fn(() => Promise.resolve());
+    vi.mocked(serveStaticBuild).mockResolvedValue({ url: "http://localhost:1234", close });
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ build: "./dist", urls: "/index.html" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ inputMode: "build" }));
+  });
+
+  it("passes inputMode: 'url' to buildAuditReport when --url is set", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ url: "https://example.com" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ inputMode: "url" }));
+  });
+
+  it("passes inputMode: 'urls' to buildAuditReport when --urls is set without --build", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ urls: "https://example.com,https://example.com/about" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ inputMode: "urls" }));
+  });
+});
+
 describe("handleRun --throttling", () => {
   it("passes desktop throttling preset to buildAuditReport", async () => {
     vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
@@ -167,6 +195,38 @@ describe("handleRun --throttling", () => {
     ).rejects.toMatchObject({ code: 2 });
     expect(stderrSpy).toHaveBeenCalledWith(
       'Error: --throttling must be one of: desktop, mobile, none (got "turbo")\n',
+    );
+  });
+});
+
+describe("handleRun resolver validation", () => {
+  it("exits with code 2 for an invalid --checks value", async () => {
+    await expect(
+      handleRun({ url: "https://example.com", checks: "a11y,notacheck" }),
+    ).rejects.toMatchObject({ code: 2 });
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("notacheck"));
+  });
+
+  it("exits with code 2 for a NaN --threshold", async () => {
+    await expect(
+      handleRun({ url: "https://example.com", threshold: Number.NaN }),
+    ).rejects.toMatchObject({ code: 2 });
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("threshold"));
+  });
+
+  it("exits with code 2 for an out-of-range --threshold", async () => {
+    await expect(handleRun({ url: "https://example.com", threshold: 150 })).rejects.toMatchObject({
+      code: 2,
+    });
+  });
+
+  it("passes checks from --checks flag to buildAuditReport", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ url: "https://example.com", checks: "a11y,perf" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(
+      expect.objectContaining({ checks: ["a11y", "perf"] }),
     );
   });
 });

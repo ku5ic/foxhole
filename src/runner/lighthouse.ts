@@ -1,8 +1,8 @@
 import lighthouse from "lighthouse";
-import { launch } from "chrome-launcher";
+import { z } from "zod";
 
-import { catalog } from "../catalog/index.js";
 import { RunnerError } from "../errors.js";
+import { catalogLookup } from "./catalog-lookup.js";
 import { buildTextFingerprint, computeFindingId } from "./finding-id.js";
 import type { Finding, PerformanceMetrics, Severity } from "../types/index.js";
 
@@ -73,6 +73,45 @@ const MOBILE_SCREEN = {
   deviceScaleFactor: 1.75,
   disabled: false,
 };
+
+const lighthouseAuditEntrySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  score: z.number().nullable(),
+  scoreDisplayMode: z.string().optional(),
+  displayValue: z.string().optional(),
+  numericValue: z.number().optional(),
+});
+
+const lighthouseCategoryEntrySchema = z.object({
+  score: z.number().nullable(),
+  auditRefs: z.array(z.object({ id: z.string() })),
+});
+
+const lighthouseLhrPartsSchema = z.object({
+  audits: z.record(z.string(), lighthouseAuditEntrySchema),
+  categories: z.record(z.string(), lighthouseCategoryEntrySchema),
+});
+
+function parseLighthouseResults(lhr: unknown): {
+  audits: Record<string, LighthouseAudit>;
+  categories: Record<string, LighthouseCategory>;
+} {
+  const result = lighthouseLhrPartsSchema.safeParse(lhr);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    const detail = issue ? `${issue.path.join(".") || "root"}: ${issue.message}` : "unknown";
+    throw new RunnerError(`Unexpected Lighthouse result shape: ${detail}`);
+  }
+  // Cast is safe: the Zod schema validates the shape; the mismatch is a TypeScript
+  // exactOptionalPropertyTypes artefact (Zod infers `string | undefined` for optional
+  // fields, the interfaces declare only `string`).
+  return result.data as {
+    audits: Record<string, LighthouseAudit>;
+    categories: Record<string, LighthouseCategory>;
+  };
+}
 
 interface LighthousePresetSettings {
   formFactor: "desktop" | "mobile";
@@ -156,11 +195,7 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
   if (audit.score !== null && audit.score >= 0.9) return null;
 
   const ruleId = `perf/${audit.id}`;
-  const entry = catalog[ruleId];
-
-  if (!entry && process.env.FOXHOLE_DEBUG === "1") {
-    process.stderr.write(`[foxhole:debug] catalog gap: ruleId=${ruleId}\n`);
-  }
+  const entry = catalogLookup(ruleId);
 
   let severity: Severity;
   if (entry) {
@@ -178,9 +213,13 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
     ? entry.recommendation
     : `Review this audit in the Lighthouse documentation: ${audit.id}`;
 
+  // For numeric audits the displayValue changes every run (e.g. "480 ms" vs "560 ms").
+  // Use the stable title so the ID does not change when the measured value shifts.
+  const fingerprintDetail =
+    scoreDisplayMode === "numeric" ? audit.title : (audit.displayValue ?? audit.title);
   const textFingerprint = buildTextFingerprint({
     ruleId: audit.id,
-    detail: audit.displayValue ?? audit.title,
+    detail: fingerprintDetail,
   });
   const id = computeFindingId({ pageUrl, ruleId, semanticPath: "", textFingerprint });
 
@@ -201,25 +240,15 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
   };
 }
 
-// Lighthouse spawns its own Chrome instance separately from the Playwright browser.
-// Unifying these is deferred debt -- see architecture spec section 13.4.
 async function runLighthouse(
   pageUrl: string,
+  port: number,
   throttling: ThrottlingPreset,
 ): Promise<LighthouseRunnerResult> {
-  let chrome;
-  try {
-    chrome = await launch({
-      chromeFlags: ["--headless=new", "--no-sandbox", "--disable-gpu"],
-    });
-  } catch (cause) {
-    throw new RunnerError("Failed to launch Chrome for Lighthouse", cause);
-  }
-
   try {
     const presetSettings = buildLighthouseConfig(throttling);
     const result = await lighthouse(pageUrl, {
-      port: chrome.port,
+      port,
       output: "json",
       logLevel: "error",
       ...presetSettings,
@@ -230,8 +259,7 @@ async function runLighthouse(
     }
 
     const { lhr } = result;
-    const audits = lhr.audits as Record<string, LighthouseAudit>;
-    const categories = lhr.categories as Record<string, LighthouseCategory>;
+    const { audits, categories } = parseLighthouseResults(lhr);
 
     const metrics = extractMetrics(audits, categories);
     const auditCategoryMap = buildAuditCategoryMap(categories);
@@ -249,14 +277,13 @@ async function runLighthouse(
   } catch (cause) {
     if (cause instanceof RunnerError) throw cause;
     throw new RunnerError("Failed to run Lighthouse audit", cause);
-  } finally {
-    chrome.kill();
   }
 }
 
 export {
   runLighthouse,
   mapLighthouseAuditToFinding,
+  parseLighthouseResults,
   extractMetrics,
   buildAuditCategoryMap,
   buildLighthouseConfig,

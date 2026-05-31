@@ -54,9 +54,12 @@ function formatErrorChain(error: unknown): string {
     return String(error);
   }
   const parts: string[] = [error.message];
+  const visited = new Set<Error>([error]);
   let cause: unknown = error.cause;
   while (cause !== undefined && cause !== null) {
     if (cause instanceof Error) {
+      if (visited.has(cause)) break;
+      visited.add(cause);
       parts.push(cause.message);
       cause = cause.cause;
     } else {

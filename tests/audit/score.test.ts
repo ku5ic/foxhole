@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { scoreFindings, scorePage, scoreReport } from "../../src/audit/score.js";
+import { scoreFromFindings, scorePage, scoreReport } from "../../src/audit/score.js";
 import type {
   CategorySummary,
   Finding,
@@ -55,24 +55,32 @@ function makePageResult(findings: Finding[]): PageResult {
   };
 }
 
-describe("scoreFindings", () => {
+// Curve reference (SEVERITY_WEIGHTS: critical=10, major=4, minor=1, SCORE_SCALE=40):
+// W=1  (1 minor)          -> round(100 * exp(-1/40))   = 98
+// W=4  (1 major)          -> round(100 * exp(-4/40))   = 90
+// W=10 (1 critical)       -> round(100 * exp(-10/40))  = 78
+// W=11 (1 critical+minor) -> round(100 * exp(-11/40))  = 76
+// W=15 (mixed)            -> round(100 * exp(-15/40))  = 69
+// W=100 (10 criticals)    -> round(100 * exp(-100/40)) = 8
+
+describe("scoreFromFindings", () => {
   it("returns 100 for empty findings array", () => {
-    expect(scoreFindings([])).toBe(100);
+    expect(scoreFromFindings([])).toBe(100);
   });
 
-  it("returns 85 for one critical finding", () => {
+  it("returns 78 for one critical finding", () => {
     const findings = [makeFinding({ severity: "critical" })];
-    expect(scoreFindings(findings)).toBe(85);
+    expect(scoreFromFindings(findings)).toBe(78);
   });
 
-  it("returns 92 for one major finding", () => {
+  it("returns 90 for one major finding", () => {
     const findings = [makeFinding({ severity: "major" })];
-    expect(scoreFindings(findings)).toBe(92);
+    expect(scoreFromFindings(findings)).toBe(90);
   });
 
   it("returns 98 for one minor finding", () => {
     const findings = [makeFinding({ severity: "minor" })];
-    expect(scoreFindings(findings)).toBe(98);
+    expect(scoreFromFindings(findings)).toBe(98);
   });
 
   it("returns correct score for mixed findings", () => {
@@ -81,16 +89,44 @@ describe("scoreFindings", () => {
       makeFinding({ id: "f2", severity: "major" }),
       makeFinding({ id: "f3", severity: "minor" }),
     ];
-    // 100 - 15 - 8 - 2 = 75
-    expect(scoreFindings(findings)).toBe(75);
+    // W = 10 + 4 + 1 = 15 -> round(100 * exp(-15/40)) = 69
+    expect(scoreFromFindings(findings)).toBe(69);
   });
 
-  it("floors at 0 when deductions exceed 100", () => {
+  it("score is strictly monotonic: more findings always lowers it", () => {
+    const base = [makeFinding({ id: "f1", severity: "critical" })];
+    const more = [...base, makeFinding({ id: "f2", severity: "minor" })];
+    expect(scoreFromFindings(more)).toBeLessThan(scoreFromFindings(base));
+  });
+
+  it("is strictly monotonic for the first 14 criticals (integer values are still distinct)", () => {
+    // Beyond ~14 criticals the rounded integers plateau at 2, then 1, before approaching 0.
+    // The underlying float is always strictly decreasing; this test covers the integer-distinct range.
+    for (let n = 1; n <= 13; n++) {
+      const findings = Array.from({ length: n }, (_, i) =>
+        makeFinding({ id: `f${String(i)}`, severity: "critical" }),
+      );
+      const next = Array.from({ length: n + 1 }, (_, i) =>
+        makeFinding({ id: `f${String(i)}`, severity: "critical" }),
+      );
+      expect(scoreFromFindings(next)).toBeLessThan(scoreFromFindings(findings));
+    }
+  });
+
+  it("still scores above 0 at 20 criticals (no hard clamp in the model)", () => {
+    // W=200 -> round(100 * exp(-5)) = 1. The model asymptotes, not floors.
+    const findings = Array.from({ length: 20 }, (_, i) =>
+      makeFinding({ id: `f${String(i)}`, severity: "critical" }),
+    );
+    expect(scoreFromFindings(findings)).toBeGreaterThan(0);
+  });
+
+  it("returns 8 for ten critical findings (no floor clamp)", () => {
     const findings = Array.from({ length: 10 }, (_, i) =>
       makeFinding({ id: `f${String(i)}`, severity: "critical" }),
     );
-    // 100 - (15 * 10) = -50, floors at 0
-    expect(scoreFindings(findings)).toBe(0);
+    // W = 100 -> round(100 * exp(-100/40)) = 8
+    expect(scoreFromFindings(findings)).toBe(8);
   });
 });
 
@@ -120,42 +156,53 @@ describe("scorePage", () => {
     expect(bundle?.status).toBe("skipped");
   });
 
-  it("scores page as the average of ok category scores, excluding skipped", () => {
+  it("computes page score from all findings, not from the category mean", () => {
     const original = makePageResult([
       makeFinding({ id: "f1", category: "a11y", severity: "critical" }),
       makeFinding({ id: "f2", category: "semantic", severity: "minor" }),
     ]);
 
-    // requestedChecks: a11y + semantic -> a11y score 85, semantic score 98
-    // perf and bundle are skipped, excluded from average
-    // Math.round((85 + 98) / 2) = Math.round(91.5) = 92
+    // Page score: all findings -> W=11 -> round(100*exp(-11/40)) = 76
+    // (old model would have averaged category scores and produced a different result)
     const scored = scorePage(original, ["a11y", "semantic"]);
-
-    expect(scored.score).toBe(92);
+    expect(scored.score).toBe(76);
 
     const a11yCat = scored.categories.find((c) => c.category === "a11y");
     expect(a11yCat?.status).toBe("ok");
     expect(a11yCat?.critical_count).toBe(1);
-    expect(a11yCat?.score).toBe(85);
+    // Category score uses only that category's findings: 1 critical -> W=10 -> 78
+    expect(a11yCat?.score).toBe(78);
 
     const semanticCat = scored.categories.find((c) => c.category === "semantic");
     expect(semanticCat?.status).toBe("ok");
     expect(semanticCat?.minor_count).toBe(1);
+    // 1 minor -> W=1 -> 98
     expect(semanticCat?.score).toBe(98);
   });
 
-  it("includes all four categories in the score when no requestedChecks override is given", () => {
-    const original = makePageResult([
+  it("page score equals scoreFromFindings over all page findings when all 4 categories run", () => {
+    const findings = [
       makeFinding({ id: "f1", category: "a11y", severity: "critical" }),
       makeFinding({ id: "f2", category: "semantic", severity: "minor" }),
-    ]);
+    ];
+    const original = makePageResult(findings);
 
-    // all 4 requested: a11y=85, perf=100, semantic=98, bundle=100
-    // Math.round((85 + 100 + 98 + 100) / 4) = Math.round(95.75) = 96
     const scored = scorePage(original);
 
-    expect(scored.score).toBe(96);
-    expect(scored.categories).toHaveLength(4);
+    expect(scored.score).toBe(scoreFromFindings(findings));
+  });
+
+  it("a page with one critical scores below 80 regardless of how many clean categories ran", () => {
+    const original = makePageResult([
+      makeFinding({ id: "f1", category: "a11y", severity: "critical" }),
+    ]);
+
+    // All four categories requested; only a11y has a finding.
+    // Old model would have averaged in 3 perfect category scores and softened the result.
+    const scored = scorePage(original);
+    expect(scored.score).toBeLessThan(80);
+    // Specifically: W=10 -> 78
+    expect(scored.score).toBe(78);
   });
 
   it("preserves errored categories from the runner layer", () => {
@@ -182,12 +229,11 @@ describe("scorePage", () => {
     expect(a11yCat?.status).toBe("errored");
     expect(a11yCat?.error?.message).toBe("axe crashed");
 
-    // errored category is excluded from the score average; only semantic (ok) contributes
     const semanticCat = scored.categories.find((c) => c.category === "semantic");
     expect(semanticCat?.status).toBe("ok");
     expect(semanticCat?.score).toBe(100);
 
-    // score is average of ok categories only: semantic = 100
+    // Page score: no findings, at least one ok category -> scoreFromFindings([]) = 100
     expect(scored.score).toBe(100);
   });
 

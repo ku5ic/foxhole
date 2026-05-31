@@ -1,13 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Browser, Page } from "playwright";
 
-import { createBrowser, createPage, waitForPageReady } from "../../src/runner/browser.js";
+import {
+  findFreePort,
+  createBrowser,
+  createPage,
+  waitForPageReady,
+} from "../../src/runner/browser.js";
 import { RunnerError } from "../../src/errors.js";
 
-const { mockLaunch } = vi.hoisted(() => ({ mockLaunch: vi.fn() }));
+const { mockLaunchServer, mockConnect } = vi.hoisted(() => ({
+  mockLaunchServer: vi.fn(),
+  mockConnect: vi.fn(),
+}));
 
 vi.mock("playwright", () => ({
-  chromium: { launch: mockLaunch },
+  chromium: { launchServer: mockLaunchServer, connect: mockConnect },
 }));
 
 beforeEach(() => {
@@ -15,15 +23,57 @@ beforeEach(() => {
 });
 
 describe("createBrowser", () => {
-  it("throws RunnerError with the original cause when chromium.launch rejects", async () => {
-    const cause = new Error("playwright launch failed");
-    mockLaunch.mockRejectedValue(cause);
+  it("throws RunnerError with the original cause when chromium.launchServer rejects", async () => {
+    const cause = new Error("server launch failed");
+    mockLaunchServer.mockRejectedValue(cause);
 
     await expect(createBrowser()).rejects.toMatchObject({
       message: "Failed to launch browser",
       cause,
     });
     await expect(createBrowser()).rejects.toBeInstanceOf(RunnerError);
+  });
+
+  it("closes the server when chromium.connect rejects", async () => {
+    const fakeServer = {
+      wsEndpoint: vi.fn(() => "ws://127.0.0.1:9222/devtools/browser/test"),
+      close: vi.fn(() => Promise.resolve()),
+    };
+    mockLaunchServer.mockResolvedValue(fakeServer);
+    mockConnect.mockRejectedValue(new Error("connect failed"));
+
+    await expect(createBrowser()).rejects.toBeInstanceOf(RunnerError);
+    expect(fakeServer.close).toHaveBeenCalledOnce();
+  });
+
+  it("returns a numeric cdpPort and passes --remote-debugging-port to launchServer", async () => {
+    const fakeServer = {
+      wsEndpoint: vi.fn(() => "ws://127.0.0.1:9222/devtools/browser/test"),
+      close: vi.fn(() => Promise.resolve()),
+    };
+    const fakeBrowser = { close: vi.fn() };
+    mockLaunchServer.mockResolvedValue(fakeServer);
+    mockConnect.mockResolvedValue(fakeBrowser);
+
+    const { cdpPort } = await createBrowser();
+
+    expect(cdpPort).toBeGreaterThan(0);
+    expect(Number.isInteger(cdpPort)).toBe(true);
+    const launchArgs = (mockLaunchServer.mock.calls as [{ args: string[] }][])[0]?.[0]?.args;
+    expect(launchArgs).toContain(`--remote-debugging-port=${String(cdpPort)}`);
+  });
+});
+
+describe("findFreePort", () => {
+  it("returns a positive integer", async () => {
+    const port = await findFreePort();
+    expect(port).toBeGreaterThan(0);
+    expect(Number.isInteger(port)).toBe(true);
+  });
+
+  it("returns distinct ports across concurrent calls", async () => {
+    const [p1, p2] = await Promise.all([findFreePort(), findFreePort()]);
+    expect(p1).not.toBe(p2);
   });
 });
 
