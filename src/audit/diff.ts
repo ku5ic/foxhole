@@ -30,6 +30,7 @@ function computeMetricsDelta(
     "performance_score",
     "accessibility_score",
     "bundle_size",
+    "framework_bundle_size",
   ];
 
   for (const key of keys) {
@@ -83,6 +84,7 @@ const NULL_METRICS: PerformanceMetrics = {
   performance_score: null,
   accessibility_score: null,
   bundle_size: null,
+  framework_bundle_size: null,
 };
 
 // Uses first-page metrics for the diff. For multi-page reports this is a simplification;

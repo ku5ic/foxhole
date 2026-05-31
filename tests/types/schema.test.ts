@@ -21,6 +21,7 @@ const validFinding = {
   wcag: "1.3.1",
   impact: "serious",
   source: null,
+  kind: null,
   url: "https://example.com",
 };
 
@@ -59,6 +60,7 @@ const validPage = {
     performance_score: 85,
     accessibility_score: 72,
     bundle_size: 425_000,
+    framework_bundle_size: null,
   },
   audited_at: "2026-04-07T12:00:00.000Z",
   duration_ms: 6200,
@@ -119,6 +121,23 @@ describe("runMetaSchema", () => {
 
   it("rejects invalid source_maps value", () => {
     const result = runMetaSchema.safeParse({ ...validMeta, source_maps: "enabled" });
+    expect(result.success).toBe(false);
+  });
+
+  it("defaults exclude_framework to false when absent", () => {
+    const result = runMetaSchema.safeParse(validMeta);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.exclude_framework).toBe(false);
+  });
+
+  it("accepts exclude_framework: true", () => {
+    const result = runMetaSchema.safeParse({ ...validMeta, exclude_framework: true });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.exclude_framework).toBe(true);
+  });
+
+  it("rejects a non-boolean exclude_framework", () => {
+    const result = runMetaSchema.safeParse({ ...validMeta, exclude_framework: "yes" });
     expect(result.success).toBe(false);
   });
 });

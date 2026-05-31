@@ -37,6 +37,7 @@
       "wcag": null,
       "impact": null,
       "source": null,
+      "kind": null,
       "url": "https://example.com"
     }
   ],
@@ -54,6 +55,7 @@
       "wcag": "1.1.1",
       "impact": "critical",
       "source": null,
+      "kind": null,
       "url": "https://example.com"
     }
   ],
@@ -71,6 +73,7 @@
       "wcag": null,
       "impact": null,
       "source": null,
+      "kind": null,
       "url": "https://example.com"
     }
   ],

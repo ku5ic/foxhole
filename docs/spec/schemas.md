@@ -61,15 +61,17 @@ export interface Finding {
   wcag: string | null; // e.g. "1.4.3" for color contrast, null if not applicable
   impact: string | null; // short impact statement from vendor (axe especially), null if absent
   source: SourceLocation | null; // resolved post-runner, null if resolution failed or disabled
+  kind: "framework" | "application" | null; // bundle only: JS chunk origin; null for all other findings
   url: string; // canonical URL of the page on which this finding was raised
 }
 ```
 
-Three additions over the v1 spec's draft schema:
+Four additions over the v1 spec's draft schema:
 
 1. `rule_id` is now explicit. The architecture spec requires it for catalog lookup; making it part of the schema makes it queryable from consumers.
 2. `source` is the new field for source map resolution.
 3. `id` is now defined as a stable hash, specified in section 2.
+4. `kind` classifies `bundle/large-javascript-chunk` findings as `"framework"` or `"application"` based on the chunk URL. All other findings carry `null`. The total-JS finding (`bundle/total-js-size`) also carries `null` because the total spans both origins. Populated by the bundle runner; all other runners set it to `null`.
 
 ### 1.4 Fix
 
@@ -128,7 +130,8 @@ export interface PerformanceMetrics {
   tbt: number | null; // milliseconds
   performance_score: number | null; // 0-100 from Lighthouse, null if perf check did not run
   accessibility_score: number | null; // 0-100 from Lighthouse a11y, separate from Foxhole a11y score
-  bundle_size: number | null; // total transferred bytes, null if bundle check did not run
+  bundle_size: number | null; // total JS transferred bytes, null if bundle check did not run
+  framework_bundle_size: number | null; // framework-classified JS bytes; null if none classified or bundle check did not run
 }
 ```
 
@@ -136,7 +139,7 @@ Every field is nullable because every field can be missing for a legitimate reas
 
 `accessibility_score` is Lighthouse's own a11y score, captured as a metric for completeness. It is not the score Foxhole computes for the `a11y` category, which is derived from finding severity and count via `audit/score.ts`. Consumers comparing the two scores should expect divergence; the rendering layer surfaces both.
 
-`bundle_size` is transferred bytes per the v1 spec decision. Decoded and gzipped sizes are not reported. If a future version adds them, they go on a new structured `BundleBreakdown` object, not as additional top-level fields.
+`bundle_size` is total transferred JS bytes. `framework_bundle_size` is the subset classified as framework (by URL pattern or content signature). Application bytes are derived as `bundle_size - framework_bundle_size` where both are non-null. Decoded and gzipped sizes are not reported. If a future version adds them, they go on a new structured `BundleBreakdown` object, not as additional top-level fields.
 
 ### 1.7 PageResult
 
@@ -178,6 +181,7 @@ export interface RunMeta {
   perf_runs: number; // value used for this run
   perf_profile: "desktop" | "mobile" | "none";
   source_maps: "auto" | "on" | "off";
+  exclude_framework: boolean; // true when --exclude-framework was active; false by default
   dependencies: {
     axe_core: string; // version of axe-core used
     lighthouse: string; // version of lighthouse used
@@ -186,12 +190,14 @@ export interface RunMeta {
 }
 ```
 
-Two changes from the v1 spec draft:
+Three changes from the v1 spec draft:
 
 1. `crawl_depth` removed. Crawling is deferred to v2; the field has no meaning in v1.
 2. `concurrency`, `perf_runs`, `perf_profile`, `source_maps`, and `dependencies` added. The architecture spec's accuracy concerns require capturing the run configuration in the report so two reports can be meaningfully compared. A perf score from a `none` profile is not comparable to one from a `mobile` profile, and the report must show that. `perf_profile` carries the Lighthouse throttling preset used for the run: `desktop` (simulated dense-4G, desktop form factor), `mobile` (simulated slow-4G, 4x CPU, mobile form factor), or `none` (observed conditions, no simulation).
 
 `dependencies` is the audit trail for "did this finding regress because the code regressed, or because axe got smarter". Without it, run comparison across time becomes unreliable.
+
+`exclude_framework` records whether framework findings were excluded from score computation during this run. A score of 85 with `exclude_framework: true` is not directly comparable to a score of 85 with `exclude_framework: false`; consumers comparing two reports should check this field before treating the scores as equivalent.
 
 ### 1.9 AuditReport
 
@@ -508,7 +514,8 @@ The full catalog content is out of scope for this spec; it lives in its own docu
         "tbt": 340,
         "performance_score": 64,
         "accessibility_score": 88,
-        "bundle_size": 521000
+        "bundle_size": 521000,
+        "framework_bundle_size": null
       },
       "audited_at": "2026-04-29T14:22:11Z",
       "duration_ms": 6200
@@ -542,6 +549,7 @@ The full catalog content is out of scope for this spec; it lives in its own docu
     "perf_runs": 1,
     "perf_profile": "none",
     "source_maps": "auto",
+    "exclude_framework": false,
     "dependencies": {
       "axe_core": "4.10.0",
       "lighthouse": "12.2.1",

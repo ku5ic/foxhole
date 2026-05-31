@@ -1,6 +1,7 @@
 import { runAudit } from "../runner/index.js";
 import type { ThrottlingPreset } from "../runner/index.js";
 import { scorePage, scoreReport } from "./score.js";
+import type { ScorePageOptions } from "./score.js";
 import { prioritizeFindings } from "./prioritize.js";
 import { summarizeReport } from "./summarize.js";
 import { validateUrl } from "../config/validate.js";
@@ -17,10 +18,12 @@ interface BuildAuditOptions {
   concurrency: number;
   perfRuns: number;
   sourceMaps: "auto" | "on" | "off";
+  excludeFramework?: boolean;
 }
 
 async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport> {
   const normalizedUrls = options.urls.map((url) => validateUrl(url));
+  const excludeFramework = options.excludeFramework ?? false;
 
   const startTime = Date.now();
 
@@ -32,7 +35,8 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
     concurrency: options.concurrency,
   });
 
-  const scoredPages = rawPages.map((page) => scorePage(page, options.checks));
+  const scoreOptions: ScorePageOptions = { excludeFramework };
+  const scoredPages = rawPages.map((page) => scorePage(page, options.checks, scoreOptions));
   const overallScore = scoreReport(scoredPages);
 
   const allFindings = scoredPages.flatMap((page) => page.findings);
@@ -40,7 +44,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
 
   const durationMs = Date.now() - startTime;
   const passed = options.threshold === undefined ? true : overallScore >= options.threshold;
-  const summary = summarizeReport(scoredPages, overallScore, passed);
+  const summary = summarizeReport(scoredPages, overallScore, passed, excludeFramework);
 
   return {
     version: 1,
@@ -63,6 +67,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
       perf_runs: options.perfRuns,
       perf_profile: options.throttling,
       source_maps: options.sourceMaps,
+      exclude_framework: excludeFramework,
       dependencies: {
         axe_core: readDependencyVersion("axe-core"),
         lighthouse: readDependencyVersion("lighthouse"),

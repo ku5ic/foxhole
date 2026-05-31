@@ -82,6 +82,7 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     wcag: null,
     impact: null,
     source: null,
+    kind: null,
     url: "https://example.com",
     ...overrides,
   };
@@ -448,5 +449,49 @@ describe("renderMarkdownReport - multi-page categories", () => {
 
     expect(output).toContain("## Categories");
     expect(output).not.toContain("## Results by page");
+  });
+});
+
+describe("renderMarkdownReport findings - framework kind annotation", () => {
+  it("appends (framework) to the heading for a framework-kind finding", () => {
+    const finding = makeFinding({
+      category: "bundle",
+      rule_id: "bundle/large-javascript-chunk",
+      title: "Single JavaScript resource exceeds 200 KB",
+      kind: "framework",
+    });
+    const report = makeReport([makePage([okCategory()], [finding])]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("[Minor] Single JavaScript resource exceeds 200 KB (framework)");
+  });
+
+  it("does not append a tag for an application-kind finding", () => {
+    const finding = makeFinding({
+      category: "bundle",
+      rule_id: "bundle/large-javascript-chunk",
+      title: "Single JavaScript resource exceeds 200 KB",
+      kind: "application",
+    });
+    const report = makeReport([makePage([okCategory()], [finding])]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).not.toContain("(framework)");
+    expect(output).not.toContain("(application)");
+  });
+
+  it("does not append a tag for a null-kind finding", () => {
+    const finding = makeFinding({
+      title: "Test finding",
+      kind: null,
+    });
+    const report = makeReport([makePage([okCategory()], [finding])]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).not.toContain("(framework)");
+    expect(output).not.toContain("(application)");
   });
 });

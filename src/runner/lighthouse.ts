@@ -182,6 +182,7 @@ function extractMetrics(
         ? null
         : Math.round(categories.accessibility.score * 100),
     bundle_size: null,
+    framework_bundle_size: null,
   };
 }
 
@@ -236,6 +237,7 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
     wcag: null,
     impact: null,
     source: null,
+    kind: null,
     url: pageUrl,
   };
 }

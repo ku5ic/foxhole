@@ -13,6 +13,7 @@ const foxholeConfigSchema = z
     concurrency: z.number().int().min(1).optional(),
     out: z.string().optional(),
     threshold: z.number().min(0).max(100).optional(),
+    exclude_framework: z.boolean().optional().default(false),
   })
   // Rejects unknown keys so typos in config files surface as errors rather than silently being ignored.
   .strict();

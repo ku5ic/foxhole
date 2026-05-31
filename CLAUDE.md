@@ -63,7 +63,7 @@ These are non-negotiable and apply to every task.
 
 - Runners run. Scorers score. Renderers render. No cross-cutting logic.
 - axe-core and Lighthouse are imported only in src/runner/.
-- Playwright is imported only in src/runner/browser.ts.
+- Playwright is launched only in src/runner/browser.ts. Other runner files may import Playwright types (e.g. `import type { Page }`) but must not launch browsers or create contexts directly.
 - MCP tools delegate to src/audit/, never directly to src/runner/.
 - CLI commands are thin. No business logic in command files.
 - Shared types live in src/types/index.ts. Do not redefine them locally.

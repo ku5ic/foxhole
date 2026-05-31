@@ -115,6 +115,7 @@ function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Fi
         wcag,
         impact: violation.impact ?? null,
         source: null,
+        kind: null,
         url: pageUrl,
       },
     ];
@@ -142,6 +143,7 @@ function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Fi
       wcag,
       impact: violation.impact ?? null,
       source: null,
+      kind: null,
       url: pageUrl,
     };
   });

@@ -26,6 +26,7 @@ const findingSchema = z.object({
   wcag: z.string().nullable(),
   impact: z.string().nullable(),
   source: sourceLocationSchema.nullable(),
+  kind: z.enum(["framework", "application"]).nullable(),
   url: z.string(),
 });
 
@@ -62,6 +63,7 @@ const performanceMetricsSchema = z.object({
   performance_score: z.number().nullable(),
   accessibility_score: z.number().nullable(),
   bundle_size: z.number().nullable(),
+  framework_bundle_size: z.number().nullable(),
 });
 
 const pageResultSchema = z
@@ -100,6 +102,7 @@ const runMetaSchema = z
     perf_runs: z.number().int(),
     perf_profile: z.enum(["desktop", "mobile", "none"]),
     source_maps: z.enum(["auto", "on", "off"]),
+    exclude_framework: z.boolean().optional().default(false),
     dependencies: dependenciesSchema,
   })
   .strict();

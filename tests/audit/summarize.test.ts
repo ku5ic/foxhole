@@ -14,6 +14,7 @@ function emptyMetrics(): PerformanceMetrics {
     performance_score: null,
     accessibility_score: null,
     bundle_size: null,
+    framework_bundle_size: null,
   };
 }
 
@@ -31,6 +32,7 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     wcag: null,
     impact: null,
     source: null,
+    kind: null,
     url: "https://example.com",
     ...overrides,
   };
@@ -103,6 +105,23 @@ describe("summarizeReport", () => {
     ];
     const summary = summarizeReport([makePage(findings)], 82, false);
     expect(summary).not.toContain("passes the configured threshold");
+  });
+
+  it("appends exclusion note when excludeFramework is true", () => {
+    const summary = summarizeReport([makePage([])], 100, true, true);
+    expect(summary).toContain(
+      "Framework findings were excluded from scoring (--exclude-framework)",
+    );
+  });
+
+  it("omits exclusion note when excludeFramework is false", () => {
+    const summary = summarizeReport([makePage([])], 100, true, false);
+    expect(summary).not.toContain("--exclude-framework");
+  });
+
+  it("omits exclusion note when excludeFramework is omitted (default)", () => {
+    const summary = summarizeReport([makePage([])], 100, true);
+    expect(summary).not.toContain("--exclude-framework");
   });
 
   it("includes an error count when categories errored", () => {

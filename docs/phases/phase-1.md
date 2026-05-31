@@ -1,6 +1,6 @@
 # Phase 1: Schema sync, catalog foundation, and core runners
 
-**Status:** Planned
+**Status:** Complete
 **Depends on:** Phase 0 (foundation hardening complete, all checks green)
 **Blocks:** Phase 2 (audit-layer validation cannot be done against drifted types and stub findings)
 
@@ -116,7 +116,7 @@ In test files, every `makeFinding`, `makeReport`, `makeFix`, `basePage` factory 
 - Add `source: null` to every `makeFinding` factory.
 - Add `rule_id: "a11y/test"` and `pages_affected: ["https://example.com"]` to every `makeFix` factory.
 - Add `duration_ms: 0` to every `makePageResult` / `basePage` factory.
-- Replace every `makeReport` `meta` block with the new `RunMeta` shape: drop `crawl_depth`, add `audited_at`, `page_count`, `concurrency: 1`, `perf_runs: 1`, `perf_profile: "standard"`, `source_maps: "auto"`, `dependencies: { axe_core: "0.0.0", lighthouse: "0.0.0", playwright: "0.0.0" }`.
+- Replace every `makeReport` `meta` block with the new `RunMeta` shape: drop `crawl_depth`, add `audited_at`, `page_count`, `concurrency: 1`, `perf_runs: 1`, `perf_profile: "none"`, `source_maps: "auto"`, `dependencies: { axe_core: "0.0.0", lighthouse: "0.0.0", playwright: "0.0.0" }`.
 
 Rewrite `tests/fixtures/sample-report.json` and `tests/fixtures/sample-diff.json` to the new shape. Use realistic content; these fixtures drive the markdown snapshot tests in Phase 3 and the diff tests today.
 
@@ -385,7 +385,7 @@ In `src/audit/index.ts`:
   - `page_count`: `pages.length`
   - `concurrency`: `1` (default; CLI flag wiring deferred)
   - `perf_runs`: `1` (default; CLI flag wiring deferred)
-  - `perf_profile`: `"standard"` (default; CLI flag wiring deferred)
+  - `perf_profile`: `"none"` (default; CLI flag wiring deferred)
   - `source_maps`: `"auto"` (default; CLI flag wiring deferred)
   - `dependencies`: `{ axe_core, lighthouse, playwright }` from package.json reads above
   - `platform`: `${process.platform}-${process.arch}` per schemas spec section 1.8 (currently just `process.platform`)

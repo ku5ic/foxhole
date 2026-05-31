@@ -192,11 +192,15 @@ function renderFindings(findings: Finding[]): string {
     );
 
     for (const finding of sorted) {
+      const kindTag = finding.kind === "framework" ? " (framework)" : "";
       lines.push(
-        `#### [${finding.severity.charAt(0).toUpperCase()}${finding.severity.slice(1)}] ${sanitizeMarkdownText(finding.title)}`,
+        `#### [${finding.severity.charAt(0).toUpperCase()}${finding.severity.slice(1)}] ${sanitizeMarkdownText(finding.title)}${kindTag}`,
         "",
       );
 
+      if (finding.description) {
+        lines.push(sanitizeMarkdownText(finding.description), "");
+      }
       if (finding.selector) {
         lines.push(`**Selector:** \`${finding.selector}\``);
       }
@@ -230,8 +234,18 @@ function renderMetrics(metrics: PerformanceMetrics): string {
   if (metrics.ttfb !== null) lines.push(`| TTFB | ${formatMs(metrics.ttfb)} |`);
   if (metrics.performance_score !== null)
     lines.push(`| Performance score | ${String(metrics.performance_score)} |`);
-  if (metrics.bundle_size !== null)
-    lines.push(`| Bundle size | ${formatKb(metrics.bundle_size)} |`);
+  if (metrics.bundle_size !== null) {
+    if (metrics.framework_bundle_size === null) {
+      lines.push(`| Bundle size | ${formatKb(metrics.bundle_size)} |`);
+    } else {
+      const appBytes = metrics.bundle_size - metrics.framework_bundle_size;
+      lines.push(
+        `| Framework bundle size | ${formatKb(metrics.framework_bundle_size)} |`,
+        `| Application bundle size | ${formatKb(appBytes)} |`,
+        `| Total bundle size | ${formatKb(metrics.bundle_size)} |`,
+      );
+    }
+  }
 
   lines.push("");
   return lines.join("\n");

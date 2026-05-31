@@ -82,6 +82,7 @@ function registerRunCommand(program: Command): void {
     .option("--throttling <preset>", "Lighthouse throttling preset: desktop, mobile, or none")
     .option("--concurrency <n>", "number of URLs to audit in parallel", Number.parseInt)
     .option("--quiet", "suppress progress output")
+    .option("--exclude-framework", "exclude framework findings from score computation")
     .addHelpText(
       "after",
       `
@@ -136,7 +137,8 @@ async function handleRun(options: RunOptions): Promise<void> {
     throw error;
   }
 
-  const { checks, threshold, outputFormat, throttling, concurrency, out } = resolved;
+  const { checks, threshold, outputFormat, throttling, concurrency, out, excludeFramework } =
+    resolved;
   const quiet = options.quiet ?? false;
 
   let server: StaticServer | null = null;
@@ -159,6 +161,7 @@ async function handleRun(options: RunOptions): Promise<void> {
       concurrency,
       perfRuns: 1,
       sourceMaps: "auto",
+      excludeFramework,
     });
   } finally {
     if (server) await server.close();

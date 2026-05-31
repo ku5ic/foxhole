@@ -17,6 +17,7 @@ interface ResolvedRunOptions {
   throttling: ThrottlingPreset;
   concurrency: number;
   out: string | undefined;
+  excludeFramework: boolean;
 }
 
 const VALID_THROTTLING: ReadonlySet<ThrottlingPreset> = new Set(["desktop", "mobile", "none"]);
@@ -29,6 +30,7 @@ function resolveRunOptions(
     throttling?: string;
     concurrency?: number;
     out?: string;
+    excludeFramework?: boolean;
   },
   config?: FoxholeConfig,
 ): ResolvedRunOptions {
@@ -65,7 +67,10 @@ function resolveRunOptions(
   // out: flag wins; if absent fall back to config
   const out = rawOptions.out ?? config?.out;
 
-  return { checks, threshold, outputFormat, throttling, concurrency, out };
+  // excludeFramework: flag wins; if absent fall back to config, then default false
+  const excludeFramework = rawOptions.excludeFramework ?? config?.exclude_framework ?? false;
+
+  return { checks, threshold, outputFormat, throttling, concurrency, out, excludeFramework };
 }
 
 export { resolveRunOptions };

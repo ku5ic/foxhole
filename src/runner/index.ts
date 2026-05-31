@@ -38,6 +38,7 @@ function emptyMetrics(): PerformanceMetrics {
     performance_score: null,
     accessibility_score: null,
     bundle_size: null,
+    framework_bundle_size: null,
   };
 }
 
@@ -154,7 +155,11 @@ async function auditSinglePage(url: string, options: RunnerOptions): Promise<Pag
           bundlePage = await createPage(browser);
           const bundleResult = await runBundleChecks(bundlePage, url, options.quiet);
           findings.push(...bundleResult.findings);
-          metrics = { ...metrics, bundle_size: bundleResult.bundle_size };
+          metrics = {
+            ...metrics,
+            bundle_size: bundleResult.bundle_size,
+            framework_bundle_size: bundleResult.framework_bundle_size,
+          };
         } catch (error) {
           const msg = formatErrorChain(error);
           log(`bundle runner failed: ${msg}`, options.quiet);
