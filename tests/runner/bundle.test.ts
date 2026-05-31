@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildBundleFindings,
+  classifyResource,
   filterNomoduleResources,
   hasPathExtension,
   measureResourceSize,
@@ -108,6 +109,46 @@ describe("total-js-size rule", () => {
     ).find((f) => f.rule_id === "bundle/total-js-size");
     expect(run1?.id).toBe(run2?.id);
   });
+
+  it("includes framework/app byte breakdown in description when framework bytes are present", () => {
+    const findings = buildBundleFindings(
+      [
+        jsResource("https://example.com/_next/static/chunks/framework-abc.js", 400 * KB),
+        jsResource("https://example.com/assets/app-abc.js", 200 * KB),
+      ],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
+    expect(match?.description).toContain("framework");
+    expect(match?.description).toContain("application");
+  });
+
+  it("omits the breakdown when no framework bytes are present", () => {
+    const findings = buildBundleFindings(
+      [
+        jsResource("https://example.com/assets/a.js", 300 * KB),
+        jsResource("https://example.com/assets/b.js", 250 * KB),
+      ],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
+    expect(match?.description).not.toContain("framework");
+  });
+
+  it("carries kind: null regardless of resource mix", () => {
+    const findings = buildBundleFindings(
+      [jsResource("https://example.com/_next/static/chunks/framework-abc.js", 600 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
+    expect(match?.kind).toBeNull();
+  });
 });
 
 describe("large-javascript-chunk rule", () => {
@@ -182,6 +223,50 @@ describe("large-javascript-chunk rule", () => {
       (f) => f.rule_id === "bundle/large-javascript-chunk",
     );
     expect(a?.id).toBe(b?.id);
+  });
+
+  it("sets kind to framework for a Next.js framework chunk", () => {
+    const findings = buildBundleFindings(
+      [jsResource("https://example.com/_next/static/chunks/framework-abc123.js", 250 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/large-javascript-chunk");
+    expect(match?.kind).toBe("framework");
+  });
+
+  it("uses the framework recommendation for a framework chunk", () => {
+    const findings = buildBundleFindings(
+      [jsResource("https://example.com/_next/static/chunks/framework-abc123.js", 250 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/large-javascript-chunk");
+    expect(match?.recommendation).toContain("framework chunk");
+  });
+
+  it("sets kind to application for a non-framework chunk", () => {
+    const findings = buildBundleFindings(
+      [jsResource("https://example.com/assets/app-abc123.js", 250 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/large-javascript-chunk");
+    expect(match?.kind).toBe("application");
+  });
+
+  it("uses the standard recommendation for an application chunk", () => {
+    const findings = buildBundleFindings(
+      [jsResource("https://example.com/assets/app-abc123.js", 250 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/large-javascript-chunk");
+    expect(match?.recommendation).not.toContain("framework chunk");
   });
 });
 
@@ -339,6 +424,104 @@ describe("hasPathExtension (BUN-2)", () => {
 
   it("handles non-parseable URLs without throwing", () => {
     expect(() => hasPathExtension("not-a-url.js", ".js")).not.toThrow();
+  });
+});
+
+describe("classifyResource", () => {
+  it("classifies a Next.js framework chunk as framework", () => {
+    expect(classifyResource("https://example.com/_next/static/chunks/framework-abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a Next.js main entry as framework", () => {
+    expect(classifyResource("https://example.com/_next/static/chunks/main-abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a Next.js app shell as framework", () => {
+    expect(classifyResource("https://example.com/_next/static/chunks/pages/_app-abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a Next.js webpack runtime as framework", () => {
+    expect(classifyResource("https://example.com/_next/static/chunks/webpack-abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a CRA runtime-main chunk as framework", () => {
+    expect(classifyResource("https://example.com/static/js/runtime-main.abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a Vite pre-bundled dep as framework", () => {
+    expect(classifyResource("https://example.com/node_modules/.vite/deps/react-dom.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a Vite vendor split chunk as framework", () => {
+    expect(classifyResource("https://example.com/assets/vendor-abc123.js")).toBe("framework");
+  });
+
+  it("classifies a Next.js externalized React chunk as framework", () => {
+    expect(classifyResource("https://example.com/_next/static/chunks/react-abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a Nuxt 3 runtime entry as framework", () => {
+    expect(classifyResource("https://example.com/_nuxt/entry.abc123.js")).toBe("framework");
+  });
+
+  it("classifies Nuxt 3 build metadata as framework", () => {
+    expect(classifyResource("https://example.com/_nuxt/builds/meta.abc123.js")).toBe("framework");
+  });
+
+  it("classifies a SvelteKit framework boot file as framework", () => {
+    expect(classifyResource("https://example.com/_app/immutable/entry/start.abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a SvelteKit Vite runtime shim as framework", () => {
+    expect(classifyResource("https://example.com/_app/immutable/start-abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a Gatsby / webpack runtime chunk as framework", () => {
+    expect(classifyResource("https://example.com/webpack-runtime-abc123.js")).toBe("framework");
+  });
+
+  it("classifies a Remix client entry as framework", () => {
+    expect(classifyResource("https://example.com/build/entry.client-abc123.js")).toBe("framework");
+  });
+
+  it("does not classify a SvelteKit page node as framework", () => {
+    expect(classifyResource("https://example.com/_app/immutable/nodes/0.abc123.js")).toBe(
+      "application",
+    );
+  });
+
+  it("classifies an application chunk as application", () => {
+    expect(classifyResource("https://example.com/_next/static/chunks/pages/index-abc.js")).toBe(
+      "application",
+    );
+  });
+
+  it("classifies a generic app bundle as application", () => {
+    expect(classifyResource("https://example.com/assets/main.abc123.js")).toBe("application");
+  });
+
+  it("uses the path only -- query strings do not affect classification", () => {
+    expect(
+      classifyResource("https://example.com/_next/static/chunks/framework-abc123.js?v=1"),
+    ).toBe("framework");
   });
 });
 

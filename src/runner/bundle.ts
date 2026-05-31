@@ -69,6 +69,36 @@ function sanitizeResourceUrl(rawUrl: string): string {
   }
 }
 
+// Substrings matched against the URL path to identify framework-generated chunks.
+// Framework bytes count toward the score (real execution cost), but the recommendation
+// differs because the developer cannot split or remove these chunks directly.
+const FRAMEWORK_URL_PATTERNS = [
+  "/_next/static/chunks/framework-", // Next.js React + framework runtime
+  "/_next/static/chunks/main-", // Next.js main entry
+  "/_next/static/chunks/pages/_app", // Next.js app shell
+  "/_next/static/chunks/webpack-", // Next.js webpack runtime
+  "/_next/static/chunks/react-", // Next.js externalized React (newer builds)
+  "/static/js/runtime-main", // Create React App runtime
+  "/node_modules/.vite/", // Vite pre-bundled deps
+  "/assets/vendor-", // Vite convention: node_modules split chunk
+  "/_nuxt/entry.", // Nuxt 3 runtime entry
+  "/_nuxt/builds/meta.", // Nuxt 3 build metadata
+  "/_app/immutable/entry/", // SvelteKit framework boot
+  "/_app/immutable/start-", // SvelteKit Vite runtime shim
+  "/webpack-runtime-", // Gatsby / generic webpack runtime
+  "/build/entry.client-", // Remix client entry
+] as const;
+
+const FRAMEWORK_CHUNK_RECOMMENDATION =
+  "This is a framework chunk. Consider whether the chosen framework fits the project's size budget, or enable more aggressive tree-shaking via the bundler config.";
+
+function classifyResource(url: string): "framework" | "application" {
+  const path = sanitizeResourceUrl(url);
+  return FRAMEWORK_URL_PATTERNS.some((pattern) => path.includes(pattern))
+    ? "framework"
+    : "application";
+}
+
 function buildBundleFindings(
   jsResources: ResourceInfo[],
   cssResources: ResourceInfo[],
@@ -83,6 +113,13 @@ function buildBundleFindings(
     const ruleId = "bundle/total-js-size";
     const entry = catalogLookup(ruleId);
     const detail = formatKb(totalJs);
+    const frameworkBytes = jsResources
+      .filter((r) => classifyResource(r.url) === "framework")
+      .reduce((sum, r) => sum + r.size, 0);
+    const totalJsDescription =
+      frameworkBytes > 0
+        ? `Total JavaScript transferred is ${detail} (${formatKb(frameworkBytes)} framework, ${formatKb(totalJs - frameworkBytes)} application), which exceeds the 500 KB threshold.`
+        : `Total JavaScript transferred is ${detail}, which exceeds the 500 KB threshold.`;
     findings.push({
       id: computeFindingId({
         pageUrl,
@@ -97,7 +134,7 @@ function buildBundleFindings(
       effort: entry?.default_effort ?? "high",
       rule_id: ruleId,
       title: entry?.title_template ?? "Total JavaScript transfer size exceeds 500 KB",
-      description: `Total JavaScript transferred is ${detail}, which exceeds the 500 KB threshold.`,
+      description: totalJsDescription,
       recommendation:
         entry?.recommendation ??
         "Split bundles, remove unused code, and lazy-load non-critical JavaScript.",
@@ -116,6 +153,12 @@ function buildBundleFindings(
       const entry = catalogLookup(ruleId);
       const sanitized = sanitizeResourceUrl(resource.url);
       const detail = resource.url;
+      const kind = classifyResource(resource.url);
+      const recommendation =
+        kind === "framework"
+          ? FRAMEWORK_CHUNK_RECOMMENDATION
+          : (entry?.recommendation ??
+            "Split this bundle into smaller chunks or lazy-load non-critical parts.");
       findings.push({
         id: computeFindingId({
           pageUrl,
@@ -129,14 +172,12 @@ function buildBundleFindings(
         rule_id: ruleId,
         title: entry?.title_template ?? "Single JavaScript resource exceeds 200 KB",
         description: `${sanitized} is ${formatKb(resource.size)}.`,
-        recommendation:
-          entry?.recommendation ??
-          "Split this bundle into smaller chunks or lazy-load non-critical parts.",
+        recommendation,
         selector: null,
         wcag: null,
         impact: null,
         source: null,
-        kind: null,
+        kind,
         url: pageUrl,
       });
     }
@@ -299,6 +340,7 @@ async function runBundleChecks(
 export {
   runBundleChecks,
   buildBundleFindings,
+  classifyResource,
   filterNomoduleResources,
   sanitizeResourceUrl,
   hasPathExtension,
