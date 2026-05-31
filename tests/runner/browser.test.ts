@@ -59,8 +59,8 @@ describe("createBrowser", () => {
 
     expect(cdpPort).toBeGreaterThan(0);
     expect(Number.isInteger(cdpPort)).toBe(true);
-    const [launchCall] = mockLaunchServer.mock.calls;
-    expect(launchCall?.[0]?.args).toContain(`--remote-debugging-port=${cdpPort}`);
+    const launchArgs = (mockLaunchServer.mock.calls as [{ args: string[] }][])[0]?.[0]?.args;
+    expect(launchArgs).toContain(`--remote-debugging-port=${String(cdpPort)}`);
   });
 });
 

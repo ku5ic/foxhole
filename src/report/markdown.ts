@@ -4,6 +4,7 @@ import type {
   CheckCategory,
   Finding,
   Fix,
+  PageResult,
   PerformanceMetrics,
 } from "../types/index.js";
 
@@ -37,19 +38,23 @@ function formatKb(bytes: number): string {
 }
 
 function renderTitle(report: AuditReport): string {
-  const page = report.pages[0];
-  const url = page ? page.url : "unknown";
-  const date = page ? page.audited_at : new Date().toISOString();
+  const date = report.meta.audited_at;
   const durationSec = (report.meta.duration_ms / 1000).toFixed(1);
+  const lines = ["# Foxhole Audit Report", ""];
 
-  return [
-    "# Foxhole Audit Report",
-    "",
-    `**URL:** ${url}`,
-    `**Audited:** ${date}`,
-    `**Duration:** ${durationSec}s`,
-    "",
-  ].join("\n");
+  if (report.pages.length === 1) {
+    const url = report.pages[0]?.url ?? "unknown";
+    lines.push(`**URL:** ${url}`);
+  } else {
+    lines.push(`**Pages audited (${String(report.pages.length)}):**`, "");
+    for (const page of report.pages) {
+      lines.push(`- ${page.url}`);
+    }
+    lines.push("");
+  }
+
+  lines.push(`**Audited:** ${date}`, `**Duration:** ${durationSec}s`, "");
+  return lines.join("\n");
 }
 
 function renderSummary(report: AuditReport): string {
@@ -84,13 +89,13 @@ function renderScore(report: AuditReport): string {
   return lines.join("\n");
 }
 
-function renderCategories(categories: CategorySummary[]): string {
+// Returns the category table rows and optional Errors list as lines, without a section heading.
+// Returns an empty array when all categories are skipped.
+function renderCategoryTableLines(categories: CategorySummary[]): string[] {
   const renderable = categories.filter((c) => c.status !== "skipped");
-  if (renderable.length === 0) return "";
+  if (renderable.length === 0) return [];
 
   const lines = [
-    "## Categories",
-    "",
     "| Category | Score | Critical | Major | Minor |",
     "| --- | --- | --- | --- | --- |",
   ];
@@ -116,7 +121,27 @@ function renderCategories(categories: CategorySummary[]): string {
     }
   }
 
-  lines.push("");
+  return lines;
+}
+
+function renderCategories(categories: CategorySummary[]): string {
+  const tableLines = renderCategoryTableLines(categories);
+  if (tableLines.length === 0) return "";
+  return ["## Categories", "", ...tableLines, ""].join("\n");
+}
+
+function renderResultsByPage(pages: PageResult[]): string {
+  const lines = ["## Results by page", ""];
+
+  for (const page of pages) {
+    lines.push(`### ${page.url} - score ${String(page.score)}`, "");
+    const tableLines = renderCategoryTableLines(page.categories);
+    if (tableLines.length > 0) {
+      lines.push(...tableLines);
+    }
+    lines.push("");
+  }
+
   return lines.join("\n");
 }
 
@@ -231,16 +256,20 @@ function renderMeta(report: AuditReport): string {
 }
 
 function renderMarkdownReport(report: AuditReport): string {
-  const allCategories = report.pages.flatMap((p) => p.categories);
   const allFindings = report.pages.flatMap((p) => p.findings);
   const hasPerf = report.meta.checks_run.includes("perf");
   const firstPage = report.pages[0];
+  const isMultiPage = report.pages.length > 1;
+
+  const categoriesSection = isMultiPage
+    ? renderResultsByPage(report.pages)
+    : renderCategories(report.pages.flatMap((p) => p.categories));
 
   const sections = [
     renderTitle(report),
     renderSummary(report),
     renderScore(report),
-    renderCategories(allCategories),
+    categoriesSection,
     renderFixes(report.prioritized_fixes),
     renderFindings(allFindings),
   ];

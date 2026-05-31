@@ -19,7 +19,9 @@ async function findFreePort(): Promise<number> {
     probe.listen(0, "127.0.0.1", () => {
       const address = probe.address();
       if (address === null || typeof address === "string") {
-        probe.close(() => reject(new RunnerError("Could not determine free port")));
+        probe.close(() => {
+          reject(new RunnerError("Could not determine free port"));
+        });
         return;
       }
       const { port } = address;
@@ -31,7 +33,9 @@ async function findFreePort(): Promise<number> {
         }
       });
     });
-    probe.on("error", (err) => reject(new RunnerError("Failed to probe for free port", err)));
+    probe.on("error", (err) => {
+      reject(new RunnerError("Failed to probe for free port", err));
+    });
   });
 }
 
@@ -47,7 +51,7 @@ async function createBrowser(): Promise<{
     const cdpPort = await findFreePort();
     server = await chromium.launchServer({
       headless: true,
-      args: ["--disable-dev-shm-usage", `--remote-debugging-port=${cdpPort}`],
+      args: ["--disable-dev-shm-usage", `--remote-debugging-port=${String(cdpPort)}`],
     });
     const browser = await chromium.connect(server.wsEndpoint());
     return { browser, server, cdpPort };

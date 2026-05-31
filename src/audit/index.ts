@@ -20,7 +20,7 @@ interface BuildAuditOptions {
 }
 
 async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport> {
-  const normalizedUrls = options.urls.map(validateUrl);
+  const normalizedUrls = options.urls.map((url) => validateUrl(url));
 
   const startTime = Date.now();
 

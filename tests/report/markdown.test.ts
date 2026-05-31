@@ -363,3 +363,90 @@ describe("renderMarkdownReport findings - source location", () => {
     expect(output).toContain("**Source:** src/components/Button.tsx:42:8");
   });
 });
+
+describe("renderMarkdownReport - multi-page title", () => {
+  it("lists all page URLs as a bullet list when more than one page is audited", () => {
+    const pages = [
+      { ...makePage([okCategory()]), url: "https://example.com/" },
+      { ...makePage([okCategory()]), url: "https://example.com/about" },
+    ];
+    const report = makeReport(pages);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("**Pages audited (2):**");
+    expect(output).toContain("- https://example.com/");
+    expect(output).toContain("- https://example.com/about");
+    expect(output).not.toContain("**URL:**");
+  });
+
+  it("keeps the single-URL line for a one-page report", () => {
+    const report = makeReport([makePage([okCategory()])]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("**URL:** https://example.com");
+    expect(output).not.toContain("**Pages audited");
+  });
+});
+
+describe("renderMarkdownReport - multi-page categories", () => {
+  it("renders a Results by page section with a subsection per URL", () => {
+    const pages = [
+      {
+        ...makePage([okCategory({ category: "a11y", score: 95 })]),
+        url: "https://example.com/",
+        score: 95,
+      },
+      {
+        ...makePage([okCategory({ category: "bundle", score: 70 })]),
+        url: "https://example.com/about",
+        score: 70,
+      },
+    ];
+    const report = makeReport(pages);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("## Results by page");
+    expect(output).toContain("### https://example.com/ - score 95");
+    expect(output).toContain("### https://example.com/about - score 70");
+    expect(output).not.toContain("## Categories");
+  });
+
+  it("shows each page's category rows under its own heading", () => {
+    const pages = [
+      {
+        ...makePage([
+          okCategory({ category: "a11y", score: 100 }),
+          erroredCategory("Lighthouse failed", { category: "perf" }),
+        ]),
+        url: "https://example.com/",
+        score: 80,
+      },
+      {
+        ...makePage([okCategory({ category: "a11y", score: 88 })]),
+        url: "https://example.com/contact",
+        score: 88,
+      },
+    ];
+    const report = makeReport(pages);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("### https://example.com/ - score 80");
+    expect(output).toContain("| Accessibility | 100 |");
+    expect(output).toContain("| Performance | errored |");
+    expect(output).toContain("### https://example.com/contact - score 88");
+    expect(output).toContain("| Accessibility | 88 |");
+  });
+
+  it("still renders the flat Categories section for a single-page report", () => {
+    const report = makeReport([makePage([okCategory()])]);
+
+    const output = renderMarkdownReport(report);
+
+    expect(output).toContain("## Categories");
+    expect(output).not.toContain("## Results by page");
+  });
+});
