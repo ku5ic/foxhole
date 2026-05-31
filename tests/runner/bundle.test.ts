@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildBundleFindings,
   classifyResource,
+  detectFramework,
   filterNomoduleResources,
   hasPathExtension,
   measureResourceSize,
@@ -163,6 +164,55 @@ describe("total-js-size rule", () => {
     const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
     expect(match?.description).toContain("400.0 KB framework");
     expect(match?.description).toContain("200.0 KB application");
+  });
+
+  it("names the detected framework and states the gap when chunks are hashed (Turbopack-style)", () => {
+    // Turbopack production builds emit fully-hashed chunk names with no framework prefix;
+    // classifyResource returns application for all of them, but /_next/ presence identifies Next.js.
+    const findings = buildBundleFindings(
+      [
+        jsResource("https://example.com/_next/static/chunks/0z_s30ati0q4r.js", 400 * KB),
+        jsResource("https://example.com/_next/static/chunks/page-abc123.js", 200 * KB),
+      ],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
+    expect(match?.description).toContain("Next.js");
+    expect(match?.description).toContain("breakdown is not available");
+    expect(match?.description).not.toContain("framework,");
+  });
+
+  it("does not use the gap sentence when per-chunk framework bytes are already measured", () => {
+    const findings = buildBundleFindings(
+      [
+        jsResource("https://example.com/_next/static/chunks/framework-abc.js", 400 * KB),
+        jsResource("https://example.com/_next/static/chunks/page-abc123.js", 200 * KB),
+      ],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
+    expect(match?.description).not.toContain("breakdown is not available");
+    expect(match?.description).toContain("400.0 KB framework");
+  });
+
+  it("uses the plain description for a non-framework app (no root pattern match, no framework bytes)", () => {
+    const findings = buildBundleFindings(
+      [
+        jsResource("https://example.com/assets/app.abc123.js", 400 * KB),
+        jsResource("https://example.com/assets/vendor.abc123.js", 200 * KB),
+      ],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
+    expect(match?.description).not.toContain("breakdown is not available");
+    expect(match?.description).not.toContain("Detected");
+    expect(match?.description).toContain("which exceeds the 500 KB threshold");
   });
 });
 
@@ -549,6 +599,56 @@ describe("classifyResource", () => {
     expect(
       classifyResource("https://example.com/_next/static/chunks/framework-abc123.js?v=1"),
     ).toBe("framework");
+  });
+});
+
+describe("detectFramework", () => {
+  it("returns 'Next.js' for a Next.js URL", () => {
+    expect(detectFramework(["https://example.com/_next/static/chunks/framework-abc.js"])).toBe(
+      "Next.js",
+    );
+  });
+
+  it("returns 'Next.js' for a Turbopack-style fully-hashed chunk (no framework prefix)", () => {
+    expect(detectFramework(["https://example.com/_next/static/chunks/0z_s30ati0q4r.js"])).toBe(
+      "Next.js",
+    );
+  });
+
+  it("returns 'Nuxt' for a Nuxt 3 resource URL", () => {
+    expect(detectFramework(["https://example.com/_nuxt/entry.abc123.js"])).toBe("Nuxt");
+  });
+
+  it("returns 'SvelteKit' for a SvelteKit resource URL", () => {
+    expect(detectFramework(["https://example.com/_app/immutable/nodes/0.abc123.js"])).toBe(
+      "SvelteKit",
+    );
+  });
+
+  it("returns null for a generic non-framework app", () => {
+    expect(
+      detectFramework([
+        "https://example.com/assets/main.abc.js",
+        "https://example.com/assets/vendor.abc.js",
+      ]),
+    ).toBeNull();
+  });
+
+  it("returns null for an empty URL list", () => {
+    expect(detectFramework([])).toBeNull();
+  });
+
+  it("returns the first matching framework when URLs from multiple frameworks appear", () => {
+    // First-match behavior: Nuxt URL listed before Next.js URL
+    const result = detectFramework([
+      "https://example.com/_nuxt/entry.abc.js",
+      "https://example.com/_next/static/chunks/abc.js",
+    ]);
+    expect(result).toBe("Nuxt");
+  });
+
+  it("ignores query strings when matching", () => {
+    expect(detectFramework(["https://example.com/_next/static/chunks/abc.js?v=1"])).toBe("Next.js");
   });
 });
 

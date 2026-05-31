@@ -102,7 +102,7 @@ function classifyResource(url: string): "framework" | "application" {
 // chunk URL matches FRAMEWORK_URL_PATTERNS (e.g. Turbopack production builds whose chunk names are
 // fully hashed with no framework-specific prefix). CRA (/static/), Vite (/assets/), Remix (/build/),
 // and Gatsby roots are intentionally omitted: they are too generic to name a framework confidently.
-const FRAMEWORK_ROOT_PATTERNS: ReadonlyArray<{ pattern: string; name: string }> = [
+const FRAMEWORK_ROOT_PATTERNS: readonly { pattern: string; name: string }[] = [
   { pattern: "/_next/", name: "Next.js" },
   { pattern: "/_nuxt/", name: "Nuxt" },
   { pattern: "/_app/immutable/", name: "SvelteKit" },
@@ -137,12 +137,14 @@ function buildBundleFindings(
       .reduce((sum, r) => sum + r.size, 0);
     const detectedFramework =
       frameworkBytes === 0 ? detectFramework(jsResources.map((r) => r.url)) : null;
-    const totalJsDescription =
-      frameworkBytes > 0
-        ? `Total JavaScript transferred is ${detail} (${formatKb(frameworkBytes)} framework, ${formatKb(totalJs - frameworkBytes)} application), which exceeds the 500 KB threshold.`
-        : detectedFramework !== null
-          ? `Total JavaScript transferred is ${detail}, which exceeds the 500 KB threshold. Detected a ${detectedFramework} app; a framework and application breakdown is not available for this build's chunk naming.`
-          : `Total JavaScript transferred is ${detail}, which exceeds the 500 KB threshold.`;
+    let totalJsDescription: string;
+    if (frameworkBytes > 0) {
+      totalJsDescription = `Total JavaScript transferred is ${detail} (${formatKb(frameworkBytes)} framework, ${formatKb(totalJs - frameworkBytes)} application), which exceeds the 500 KB threshold.`;
+    } else if (detectedFramework === null) {
+      totalJsDescription = `Total JavaScript transferred is ${detail}, which exceeds the 500 KB threshold.`;
+    } else {
+      totalJsDescription = `Total JavaScript transferred is ${detail}, which exceeds the 500 KB threshold. Detected a ${detectedFramework} app; a framework and application breakdown is not available for this build's chunk naming.`;
+    }
     findings.push({
       id: computeFindingId({
         pageUrl,
