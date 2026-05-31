@@ -2,7 +2,7 @@ import { RunnerError, formatErrorChain } from "../errors.js";
 import { createBrowser, createPage, waitForPageReady } from "./browser.js";
 import { runAxe } from "./axe.js";
 import { runLighthouse } from "./lighthouse.js";
-import type { ThrottlingPreset } from "./lighthouse.js";
+import type { LighthouseRunnerResult, ThrottlingPreset } from "./lighthouse.js";
 import { runSemanticChecks } from "./semantic.js";
 import { runBundleChecks } from "./bundle.js";
 import type {
@@ -73,6 +73,21 @@ function buildErroredPageResult(
   };
 }
 
+// Lighthouse uses process-global performance.mark()/clearMarks() internally.
+// Two concurrent Lighthouse runs in the same Node.js process stomp each other's
+// named marks, producing "mark not found" errors. This queue serializes them.
+let lighthouseQueueTail: Promise<unknown> = Promise.resolve();
+
+function runLighthouseQueued(
+  url: string,
+  cdpPort: number,
+  throttling: ThrottlingPreset,
+): Promise<LighthouseRunnerResult> {
+  const entry = lighthouseQueueTail.then(() => runLighthouse(url, cdpPort, throttling));
+  lighthouseQueueTail = entry.catch(() => undefined);
+  return entry;
+}
+
 async function auditSinglePage(url: string, options: RunnerOptions): Promise<PageResult> {
   const pageStartTime = Date.now();
   log(`Auditing ${url}`, options.quiet);
@@ -110,7 +125,7 @@ async function auditSinglePage(url: string, options: RunnerOptions): Promise<Pag
       if (options.checks.includes("perf")) {
         log("Running performance checks", options.quiet);
         try {
-          const lighthouseResult = await runLighthouse(url, cdpPort, options.throttling);
+          const lighthouseResult = await runLighthouseQueued(url, cdpPort, options.throttling);
           metrics = { ...metrics, ...lighthouseResult.metrics };
           findings.push(...lighthouseResult.findings);
         } catch (error) {
