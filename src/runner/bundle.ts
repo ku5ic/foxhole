@@ -434,5 +434,6 @@ export {
   sanitizeResourceUrl,
   hasPathExtension,
   measureResourceSize,
+  MAX_TOTAL_JS_BYTES,
 };
 export type { BundleRunnerResult, ResourceInfo };

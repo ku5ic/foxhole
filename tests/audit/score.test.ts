@@ -22,6 +22,7 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     wcag: null,
     impact: null,
     source: null,
+    kind: null,
     url: "https://example.com",
     ...overrides,
   };
@@ -38,10 +39,14 @@ function emptyMetrics(): PerformanceMetrics {
     performance_score: null,
     accessibility_score: null,
     bundle_size: null,
+    framework_bundle_size: null,
   };
 }
 
-function makePageResult(findings: Finding[]): PageResult {
+function makePageResult(
+  findings: Finding[],
+  metricsOverrides: Partial<PerformanceMetrics> = {},
+): PageResult {
   return {
     url: "https://example.com",
     status: "ok",
@@ -49,7 +54,7 @@ function makePageResult(findings: Finding[]): PageResult {
     score: 0,
     categories: [],
     findings,
-    metrics: emptyMetrics(),
+    metrics: { ...emptyMetrics(), ...metricsOverrides },
     audited_at: "2026-04-07T00:00:00.000Z",
     duration_ms: 0,
   };
@@ -263,6 +268,135 @@ describe("scorePage", () => {
     scorePage(original);
     expect(original.score).toBe(0);
     expect(original.categories).toHaveLength(0);
+  });
+
+  describe("excludeFramework option", () => {
+    const OVER_THRESHOLD = 600 * 1024; // 600 KB total
+    const FRAMEWORK_BYTES = 450 * 1024; // 450 KB framework
+    // app bytes = 600 - 450 = 150 KB, under the 500 KB threshold
+
+    const FRAMEWORK_CHUNK_FINDING = makeFinding({
+      id: "fw-chunk",
+      category: "bundle",
+      severity: "minor",
+      rule_id: "bundle/large-javascript-chunk",
+      kind: "framework",
+    });
+
+    const TOTAL_JS_FINDING = makeFinding({
+      id: "total-js",
+      category: "bundle",
+      severity: "major",
+      rule_id: "bundle/total-js-size",
+      kind: null,
+    });
+
+    const APP_CHUNK_FINDING = makeFinding({
+      id: "app-chunk",
+      category: "bundle",
+      severity: "minor",
+      rule_id: "bundle/large-javascript-chunk",
+      kind: "application",
+    });
+
+    const A11Y_FINDING = makeFinding({
+      id: "a11y-1",
+      category: "a11y",
+      severity: "critical",
+      rule_id: "a11y/color-contrast",
+    });
+
+    it("flag off produces same result as no option (regression)", () => {
+      const findings = [FRAMEWORK_CHUNK_FINDING, TOTAL_JS_FINDING, A11Y_FINDING];
+      const page = makePageResult(findings, {
+        bundle_size: OVER_THRESHOLD,
+        framework_bundle_size: FRAMEWORK_BYTES,
+      });
+      const withOff = scorePage(page, undefined, { excludeFramework: false });
+      const withDefault = scorePage(page);
+      expect(withOff.score).toBe(withDefault.score);
+      expect(withOff.categories).toEqual(withDefault.categories);
+    });
+
+    it("framework large-chunk finding is dropped from the score when flag is on", () => {
+      const findings = [FRAMEWORK_CHUNK_FINDING];
+      const page = makePageResult(findings, {
+        bundle_size: OVER_THRESHOLD,
+        framework_bundle_size: FRAMEWORK_BYTES,
+      });
+      const withFlag = scorePage(page, undefined, { excludeFramework: true });
+      // Framework chunk excluded -> scoring findings empty -> score 100
+      expect(withFlag.score).toBe(100);
+    });
+
+    it("application large-chunk finding is retained in the score when flag is on", () => {
+      const findings = [APP_CHUNK_FINDING];
+      const page = makePageResult(findings, {
+        bundle_size: OVER_THRESHOLD,
+        framework_bundle_size: FRAMEWORK_BYTES,
+      });
+      const withFlag = scorePage(page, undefined, { excludeFramework: true });
+      // App chunk retained -> 1 minor -> 98
+      expect(withFlag.score).toBe(98);
+    });
+
+    it("total-js-size finding is dropped from score when app bytes are under threshold", () => {
+      // app bytes = 150 KB < 500 KB -> finding excluded from score
+      const findings = [TOTAL_JS_FINDING];
+      const page = makePageResult(findings, {
+        bundle_size: OVER_THRESHOLD,
+        framework_bundle_size: FRAMEWORK_BYTES,
+      });
+      const withFlag = scorePage(page, undefined, { excludeFramework: true });
+      expect(withFlag.score).toBe(100);
+    });
+
+    it("total-js-size finding is retained in score when app bytes still exceed threshold", () => {
+      // app bytes = 600 KB - 50 KB = 550 KB, over the 500 KB threshold
+      const findings = [TOTAL_JS_FINDING];
+      const page = makePageResult(findings, {
+        bundle_size: 600 * 1024,
+        framework_bundle_size: 50 * 1024,
+      });
+      const withFlag = scorePage(page, undefined, { excludeFramework: true });
+      // 1 major retained -> W=4 -> 90
+      expect(withFlag.score).toBe(90);
+    });
+
+    it("finding counts reflect the full finding set regardless of the flag", () => {
+      const findings = [FRAMEWORK_CHUNK_FINDING, TOTAL_JS_FINDING, APP_CHUNK_FINDING];
+      const page = makePageResult(findings, {
+        bundle_size: OVER_THRESHOLD,
+        framework_bundle_size: FRAMEWORK_BYTES,
+      });
+      const withFlag = scorePage(page, undefined, { excludeFramework: true });
+      const bundleCat = withFlag.categories.find((c) => c.category === "bundle");
+      // All three bundle findings still counted
+      expect(bundleCat?.findings_count).toBe(3);
+      expect(bundleCat?.minor_count).toBe(2);
+      expect(bundleCat?.major_count).toBe(1);
+    });
+
+    it("handles null bundle_size and framework_bundle_size safely (treats as 0 bytes)", () => {
+      const findings = [FRAMEWORK_CHUNK_FINDING, TOTAL_JS_FINDING];
+      const page = makePageResult(findings);
+      // null metrics: framework bytes = 0, total bytes = 0, app bytes = 0 <= 500 KB
+      // both findings excluded from score
+      expect(() => scorePage(page, undefined, { excludeFramework: true })).not.toThrow();
+      const withFlag = scorePage(page, undefined, { excludeFramework: true });
+      expect(withFlag.score).toBe(100);
+    });
+
+    it("non-bundle findings are never excluded regardless of the flag", () => {
+      const findings = [A11Y_FINDING, FRAMEWORK_CHUNK_FINDING];
+      const page = makePageResult(findings, {
+        bundle_size: OVER_THRESHOLD,
+        framework_bundle_size: FRAMEWORK_BYTES,
+      });
+      const withFlag = scorePage(page, undefined, { excludeFramework: true });
+      // a11y critical retained -> W=10 -> 78
+      expect(withFlag.score).toBe(78);
+    });
   });
 });
 
