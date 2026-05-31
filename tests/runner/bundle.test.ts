@@ -650,6 +650,15 @@ describe("detectFramework", () => {
   it("ignores query strings when matching", () => {
     expect(detectFramework(["https://example.com/_next/static/chunks/abc.js?v=1"])).toBe("Next.js");
   });
+
+  it("finds a match in the second URL when the first does not match", () => {
+    expect(
+      detectFramework([
+        "https://example.com/assets/vendor.abc.js",
+        "https://example.com/_next/static/chunks/page.abc.js",
+      ]),
+    ).toBe("Next.js");
+  });
 });
 
 describe("filterNomoduleResources", () => {
