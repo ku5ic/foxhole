@@ -123,6 +123,23 @@ describe("runMetaSchema", () => {
     const result = runMetaSchema.safeParse({ ...validMeta, source_maps: "enabled" });
     expect(result.success).toBe(false);
   });
+
+  it("defaults exclude_framework to false when absent", () => {
+    const result = runMetaSchema.safeParse(validMeta);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.exclude_framework).toBe(false);
+  });
+
+  it("accepts exclude_framework: true", () => {
+    const result = runMetaSchema.safeParse({ ...validMeta, exclude_framework: true });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.exclude_framework).toBe(true);
+  });
+
+  it("rejects a non-boolean exclude_framework", () => {
+    const result = runMetaSchema.safeParse({ ...validMeta, exclude_framework: "yes" });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("pageResultSchema", () => {

@@ -181,6 +181,7 @@ export interface RunMeta {
   perf_runs: number; // value used for this run
   perf_profile: "desktop" | "mobile" | "none";
   source_maps: "auto" | "on" | "off";
+  exclude_framework: boolean; // true when --exclude-framework was active; false by default
   dependencies: {
     axe_core: string; // version of axe-core used
     lighthouse: string; // version of lighthouse used
@@ -189,12 +190,14 @@ export interface RunMeta {
 }
 ```
 
-Two changes from the v1 spec draft:
+Three changes from the v1 spec draft:
 
 1. `crawl_depth` removed. Crawling is deferred to v2; the field has no meaning in v1.
 2. `concurrency`, `perf_runs`, `perf_profile`, `source_maps`, and `dependencies` added. The architecture spec's accuracy concerns require capturing the run configuration in the report so two reports can be meaningfully compared. A perf score from a `none` profile is not comparable to one from a `mobile` profile, and the report must show that. `perf_profile` carries the Lighthouse throttling preset used for the run: `desktop` (simulated dense-4G, desktop form factor), `mobile` (simulated slow-4G, 4x CPU, mobile form factor), or `none` (observed conditions, no simulation).
 
 `dependencies` is the audit trail for "did this finding regress because the code regressed, or because axe got smarter". Without it, run comparison across time becomes unreliable.
+
+`exclude_framework` records whether framework findings were excluded from score computation during this run. A score of 85 with `exclude_framework: true` is not directly comparable to a score of 85 with `exclude_framework: false`; the diff command surfaces this as a comparability note.
 
 ### 1.9 AuditReport
 

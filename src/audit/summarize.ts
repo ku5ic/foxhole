@@ -4,7 +4,7 @@ function summarizeReport(
   pages: PageResult[],
   score: number,
   passed: boolean,
-  excludeFramework: boolean = false,
+  excludeFramework = false,
 ): string {
   const pageCount = pages.length;
   const allFindings = pages.flatMap((p) => p.findings);

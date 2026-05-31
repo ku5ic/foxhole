@@ -67,6 +67,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
       perf_runs: options.perfRuns,
       perf_profile: options.throttling,
       source_maps: options.sourceMaps,
+      exclude_framework: excludeFramework,
       dependencies: {
         axe_core: readDependencyVersion("axe-core"),
         lighthouse: readDependencyVersion("lighthouse"),

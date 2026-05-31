@@ -102,6 +102,7 @@ const runMetaSchema = z
     perf_runs: z.number().int(),
     perf_profile: z.enum(["desktop", "mobile", "none"]),
     source_maps: z.enum(["auto", "on", "off"]),
+    exclude_framework: z.boolean().optional().default(false),
     dependencies: dependenciesSchema,
   })
   .strict();
