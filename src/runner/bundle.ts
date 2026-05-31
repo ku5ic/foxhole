@@ -38,8 +38,14 @@ function hasPathExtension(rawUrl: string, ext: string): boolean {
 }
 
 async function measureResourceSize(response: PlaywrightResponse): Promise<number> {
-  const contentLength = response.headers()["content-length"];
-  if (contentLength !== undefined) {
+  const headers = response.headers();
+  // Only use Content-Length when the response is not compressed. If content-encoding is present,
+  // Content-Length reflects the compressed transfer size while body.length is the decoded size;
+  // using the compressed size would let gzipped bundles below the transfer threshold but above
+  // the decoded threshold slip past the size checks.
+  const encoding = headers["content-encoding"];
+  const contentLength = headers["content-length"];
+  if (!encoding && contentLength !== undefined) {
     const parsed = Number.parseInt(contentLength, 10);
     if (Number.isFinite(parsed) && parsed >= 0) return parsed;
   }
@@ -257,5 +263,11 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
   };
 }
 
-export { runBundleChecks, buildBundleFindings, sanitizeResourceUrl, hasPathExtension };
+export {
+  runBundleChecks,
+  buildBundleFindings,
+  sanitizeResourceUrl,
+  hasPathExtension,
+  measureResourceSize,
+};
 export type { BundleRunnerResult, ResourceInfo };

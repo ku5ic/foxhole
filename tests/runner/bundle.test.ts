@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildBundleFindings,
   hasPathExtension,
+  measureResourceSize,
   sanitizeResourceUrl,
   type ResourceInfo,
 } from "../../src/runner/bundle.js";
@@ -11,6 +12,16 @@ const PAGE_URL = "https://example.com";
 
 const KB = 1024;
 const MB = 1024 * KB;
+
+function makeResponse(
+  headerMap: Record<string, string>,
+  bodyBytes: number,
+): { headers: () => Record<string, string>; body: () => Promise<Buffer> } {
+  return {
+    headers: (): Record<string, string> => headerMap,
+    body: (): Promise<Buffer> => Promise.resolve(Buffer.alloc(bodyBytes)),
+  };
+}
 
 function jsResource(url: string, sizeBytes: number): ResourceInfo {
   return { url, size: sizeBytes };
@@ -327,6 +338,33 @@ describe("hasPathExtension (BUN-2)", () => {
 
   it("handles non-parseable URLs without throwing", () => {
     expect(() => hasPathExtension("not-a-url.js", ".js")).not.toThrow();
+  });
+});
+
+describe("measureResourceSize", () => {
+  it("returns Content-Length value for an uncompressed response (no encoding header)", async () => {
+    const response = makeResponse({ "content-length": "123456" }, 0);
+    expect(await measureResourceSize(response as never)).toBe(123_456);
+  });
+
+  it("falls back to body length when Content-Length is absent", async () => {
+    const response = makeResponse({}, 200 * 1024);
+    expect(await measureResourceSize(response as never)).toBe(200 * 1024);
+  });
+
+  it("ignores Content-Length when content-encoding is present (compressed response)", async () => {
+    // Transfer size is 150 KB, decoded body is 600 KB -- the decoded size must win.
+    const response = makeResponse(
+      { "content-encoding": "gzip", "content-length": String(150 * 1024) },
+      600 * 1024,
+    );
+    expect(await measureResourceSize(response as never)).toBe(600 * 1024);
+  });
+
+  it("caps the body at MAX_BODY_BUFFER_BYTES (10 MB) when Content-Length is absent", async () => {
+    const oversized = 15 * 1024 * 1024;
+    const response = makeResponse({}, oversized);
+    expect(await measureResourceSize(response as never)).toBe(10 * 1024 * 1024);
   });
 });
 

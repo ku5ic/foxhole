@@ -2,8 +2,9 @@ import { ConfigError } from "../errors.js";
 import { checkCategorySchema } from "../types/schema.js";
 import type { CheckCategory } from "../types/index.js";
 
-// Only http and https are safe for remote auditing. file:, javascript:, and data:
-// would allow SSRF or script injection through the audit target URL.
+// Blocks non-http(s) protocols (file:, javascript:, data:) from being used as audit targets.
+// Internal-address SSRF (169.254.x, 10.x, localhost) is not blocked here; that is deferred to
+// the hosted layer where the risk is meaningful.
 const ALLOWED_URL_PROTOCOLS = new Set(["http:", "https:"]);
 
 function validateUrl(raw: string): string {

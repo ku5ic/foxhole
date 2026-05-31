@@ -21,7 +21,10 @@ const SEVERITY_ORDER: Record<string, number> = {
 };
 
 function sanitizeMarkdownText(text: string): string {
-  // Escape backticks to prevent them from opening/closing inline code spans inside prose.
+  // Escapes backticks only. Backticks are the primary injection vector (inline code spans in prose
+  // and headings). Other markdown control chars (#, -, *, |) are not escaped here because titles
+  // and recommendations are catalog-controlled and the risk is low; leading-| table injection is
+  // not reachable via finding fields that are interpolated outside of table cells.
   return text.replaceAll("`", "\\`");
 }
 
