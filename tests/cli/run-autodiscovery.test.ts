@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { handleRun } from "../../src/cli/commands/run.js";
+import { loadConfig } from "../../src/config/load.js";
 import { buildAuditReport } from "../../src/audit/index.js";
 import type { AuditReport } from "../../src/types/index.js";
 
@@ -75,5 +76,69 @@ describe("handleRun config auto-discovery", () => {
     // The mocked loadConfig returns { checks: ["a11y"] }.
     // The resolver uses that as the checks value since --checks is not set.
     expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ checks: ["a11y"] }));
+  });
+});
+
+describe("handleRun config-supplied URLs", () => {
+  it("uses urls array from config when --urls is not passed", async () => {
+    vi.mocked(loadConfig).mockResolvedValue({
+      urls: ["https://example.com/", "https://example.com/about"],
+      checks: ["a11y", "perf", "semantic", "bundle"],
+      output: "markdown",
+    });
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ config: "/fake/foxhole.config.json" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        urls: ["https://example.com/", "https://example.com/about"],
+        inputMode: "urls",
+      }),
+    );
+  });
+
+  it("uses url from config when --url is not passed", async () => {
+    vi.mocked(loadConfig).mockResolvedValue({
+      url: "https://example.com/",
+      checks: ["a11y", "perf", "semantic", "bundle"],
+      output: "markdown",
+    });
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ config: "/fake/foxhole.config.json" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        urls: ["https://example.com/"],
+        inputMode: "url",
+      }),
+    );
+  });
+
+  it("CLI --url overrides url from config", async () => {
+    vi.mocked(loadConfig).mockResolvedValue({
+      url: "https://config.example.com/",
+      checks: ["a11y", "perf", "semantic", "bundle"],
+      output: "markdown",
+    });
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ url: "https://cli.example.com/", config: "/fake/foxhole.config.json" });
+
+    expect(buildAuditReport).toHaveBeenCalledWith(
+      expect.objectContaining({ urls: ["https://cli.example.com/"] }),
+    );
+  });
+
+  it("exits with code 2 when config has no urls and no CLI flag is provided", async () => {
+    vi.mocked(loadConfig).mockResolvedValue({
+      checks: ["a11y"],
+      output: "markdown",
+    });
+
+    await expect(handleRun({ config: "/fake/foxhole.config.json" })).rejects.toThrow(
+      "process.exit called",
+    );
   });
 });

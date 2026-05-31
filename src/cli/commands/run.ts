@@ -16,9 +16,10 @@ import type { AuditReport } from "../../types/index.js";
 
 type InputMode = "url" | "urls" | "build";
 
-function validateInputMode(options: RunOptions): InputMode {
-  const hasUrl = options.url !== undefined;
-  const hasUrls = options.urls !== undefined;
+function validateInputMode(options: RunOptions, config: FoxholeConfig | undefined): InputMode {
+  const hasUrl = options.url !== undefined || config?.url !== undefined;
+  const hasUrls =
+    options.urls !== undefined || (config?.urls !== undefined && config.urls.length > 0);
   const hasBuild = options.build !== undefined;
 
   if (!hasUrl && !hasUrls && !hasBuild) {
@@ -46,16 +47,24 @@ function validateInputMode(options: RunOptions): InputMode {
   return "urls";
 }
 
-function resolveUrls(options: RunOptions, serverUrl: string | null): string[] {
-  if (options.url !== undefined) return [options.url];
-  if (options.urls !== undefined) {
-    const parts = options.urls.split(",").map((s) => s.trim());
-    if (serverUrl !== null) {
-      return parts.map((u) => (u.startsWith("/") ? `${serverUrl}${u}` : u));
-    }
-    return parts;
+function resolveUrls(
+  options: RunOptions,
+  serverUrl: string | null,
+  config: FoxholeConfig | undefined,
+): string[] {
+  // CLI flags win; config fields are the fallback.
+  const effectiveUrl = options.url ?? config?.url;
+  if (effectiveUrl !== undefined) return [effectiveUrl];
+
+  const parts =
+    options.urls !== undefined
+      ? options.urls.split(",").map((s) => s.trim())
+      : (config?.urls ?? []);
+
+  if (serverUrl !== null) {
+    return parts.map((u) => (u.startsWith("/") ? `${serverUrl}${u}` : u));
   }
-  return [];
+  return parts;
 }
 
 function registerRunCommand(program: Command): void {
@@ -113,9 +122,8 @@ async function loadConfigForRun(
 }
 
 async function handleRun(options: RunOptions): Promise<void> {
-  const mode = validateInputMode(options);
-
   const config = await loadConfigForRun(options.config);
+  const mode = validateInputMode(options, config);
 
   let resolved;
   try {
@@ -139,7 +147,7 @@ async function handleRun(options: RunOptions): Promise<void> {
       server = await serveStaticBuild(options.build);
       serverUrl = server.url;
     }
-    const urls = resolveUrls(options, serverUrl);
+    const urls = resolveUrls(options, serverUrl, config);
 
     report = await buildAuditReport({
       urls,
