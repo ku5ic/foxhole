@@ -1,13 +1,10 @@
-import fs from "node:fs";
-import path from "node:path";
-import url from "node:url";
-
 import { runAudit } from "../runner/index.js";
 import type { ThrottlingPreset } from "../runner/index.js";
 import { scorePage, scoreReport } from "./score.js";
 import { prioritizeFindings } from "./prioritize.js";
 import { summarizeReport } from "./summarize.js";
 import { validateUrl } from "../config/validate.js";
+import { readFoxholeVersion, readDependencyVersion } from "../version.js";
 import type { AuditReport, CheckCategory, InputMode } from "../types/index.js";
 
 interface BuildAuditOptions {
@@ -20,28 +17,6 @@ interface BuildAuditOptions {
   concurrency: number;
   perfRuns: number;
   sourceMaps: "auto" | "on" | "off";
-}
-
-function readPackageJsonVersion(packageJsonPath: string): string {
-  try {
-    const raw = fs.readFileSync(packageJsonPath, "utf8");
-    const parsed = JSON.parse(raw) as { version: string };
-    return parsed.version;
-  } catch {
-    return "unknown";
-  }
-}
-
-function readVersion(): string {
-  const dir = path.dirname(url.fileURLToPath(import.meta.url));
-  return readPackageJsonVersion(path.resolve(dir, "..", "..", "package.json"));
-}
-
-function readDependencyVersion(name: string): string {
-  const dir = path.dirname(url.fileURLToPath(import.meta.url));
-  return readPackageJsonVersion(
-    path.resolve(dir, "..", "..", "node_modules", name, "package.json"),
-  );
 }
 
 async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport> {
@@ -75,7 +50,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
     pages: scoredPages,
     prioritized_fixes: prioritizedFixes,
     meta: {
-      foxhole_version: readVersion(),
+      foxhole_version: readFoxholeVersion(),
       node_version: process.version,
       platform: `${process.platform}-${process.arch}`,
       audited_at: new Date(startTime).toISOString(),

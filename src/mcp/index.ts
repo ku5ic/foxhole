@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { formatErrorChain } from "../errors.js";
+import { readFoxholeVersion } from "../version.js";
 import { runFullAuditTool } from "./tools/run_full_audit.js";
 import { runAccessibilityAuditTool } from "./tools/run_accessibility_audit.js";
 import { runPerformanceAuditTool } from "./tools/run_performance_audit.js";
@@ -18,7 +19,7 @@ function errorResult(error: unknown): { content: [{ type: "text"; text: string }
 function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "foxhole",
-    version: "0.1.0",
+    version: readFoxholeVersion(),
   });
 
   server.registerTool(

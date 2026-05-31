@@ -210,7 +210,11 @@ function deduplicateResources(resources: ResourceInfo[]): ResourceInfo[] {
   return [...seen.values()];
 }
 
-async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunnerResult> {
+async function runBundleChecks(
+  page: Page,
+  pageUrl: string,
+  quiet: boolean,
+): Promise<BundleRunnerResult> {
   const jsResources: ResourceInfo[] = [];
   const cssResources: ResourceInfo[] = [];
   const httpResources: string[] = [];
@@ -236,8 +240,13 @@ async function runBundleChecks(page: Page, pageUrl: string): Promise<BundleRunne
 
       if (isJs) jsResources.push({ url: responseUrl, size });
       if (isCss) cssResources.push({ url: responseUrl, size });
-    } catch {
-      // response body may not be available for redirects or certain resource types
+    } catch (err) {
+      // body may not be available for redirects or certain resource types; non-fatal
+      if (!quiet) {
+        process.stderr.write(
+          `[foxhole] bundle: could not measure ${sanitizeResourceUrl(response.url())}: ${String(err)}\n`,
+        );
+      }
     }
   };
 

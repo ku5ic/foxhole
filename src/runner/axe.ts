@@ -7,6 +7,7 @@ import type { Page } from "playwright";
 import { RunnerError } from "../errors.js";
 import { catalogLookup } from "./catalog-lookup.js";
 import { buildSemanticPath, buildTextFingerprint, computeFindingId } from "./finding-id.js";
+import { sanitizeSelector } from "./sanitize.js";
 import type { Finding, Severity } from "../types/index.js";
 
 interface AxeRunnerResult {
@@ -51,11 +52,6 @@ function extractWcag(tags: string[]): string | null {
     if (major && minor) return `${major}.${minor}.${clause}`;
   }
   return null;
-}
-
-function sanitizeSelector(selector: string): string {
-  // Remove <, >, and ` -- they would break markdown tags and inline code spans.
-  return selector.replaceAll(/[<>`]/g, "").slice(0, 200);
 }
 
 function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Finding[] {

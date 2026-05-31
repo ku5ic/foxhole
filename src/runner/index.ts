@@ -136,16 +136,18 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
 
         if (options.checks.includes("bundle")) {
           log("Running bundle checks", options.quiet);
+          let bundlePage;
           try {
-            const bundlePage = await createPage(browser);
-            const bundleResult = await runBundleChecks(bundlePage, url);
+            bundlePage = await createPage(browser);
+            const bundleResult = await runBundleChecks(bundlePage, url, options.quiet);
             findings.push(...bundleResult.findings);
             metrics = { ...metrics, bundle_size: bundleResult.bundle_size };
-            await bundlePage.close();
           } catch (error) {
             const msg = formatErrorChain(error);
             log(`bundle runner failed: ${msg}`, options.quiet);
             erroredCategories.push(buildErroredCategorySummary("bundle", msg));
+          } finally {
+            await bundlePage?.close();
           }
         }
 

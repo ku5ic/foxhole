@@ -3,6 +3,7 @@ import type { Page } from "playwright";
 import { RunnerError } from "../errors.js";
 import { catalogLookup } from "./catalog-lookup.js";
 import { buildSemanticPath, buildTextFingerprint, computeFindingId } from "./finding-id.js";
+import { sanitizeSelector } from "./sanitize.js";
 import type { Finding } from "../types/index.js";
 
 interface SemanticRunnerResult {
@@ -108,7 +109,7 @@ function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: strin
       title: entry ? entry.title_template : result.check,
       description: issue.detail,
       recommendation: entry ? entry.recommendation : "Review and fix the semantic issue.",
-      selector: issue.selector,
+      selector: issue.selector === null ? null : sanitizeSelector(issue.selector),
       wcag: null,
       impact: null,
       source: null,
