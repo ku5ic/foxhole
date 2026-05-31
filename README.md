@@ -62,6 +62,8 @@ Options:
   --config        Path to foxhole.config.json
   --threshold     Exit with code 1 if score drops below this value (useful in CI)
   --throttling    Lighthouse throttling preset: desktop, mobile, or none (default: none)
+  --concurrency   Number of URLs to audit in parallel (default: 1)
+  --exclude-framework  Exclude framework JS findings from score computation
   --quiet         Suppress progress output
 ```
 
