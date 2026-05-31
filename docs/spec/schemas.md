@@ -514,7 +514,8 @@ The full catalog content is out of scope for this spec; it lives in its own docu
         "tbt": 340,
         "performance_score": 64,
         "accessibility_score": 88,
-        "bundle_size": 521000
+        "bundle_size": 521000,
+        "framework_bundle_size": null
       },
       "audited_at": "2026-04-29T14:22:11Z",
       "duration_ms": 6200
@@ -548,6 +549,7 @@ The full catalog content is out of scope for this spec; it lives in its own docu
     "perf_runs": 1,
     "perf_profile": "none",
     "source_maps": "auto",
+    "exclude_framework": false,
     "dependencies": {
       "axe_core": "4.10.0",
       "lighthouse": "12.2.1",
