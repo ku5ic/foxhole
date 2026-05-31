@@ -1,5 +1,6 @@
 import lighthouse from "lighthouse";
 import { launch } from "chrome-launcher";
+import { z } from "zod";
 
 import { RunnerError } from "../errors.js";
 import { catalogLookup } from "./catalog-lookup.js";
@@ -73,6 +74,45 @@ const MOBILE_SCREEN = {
   deviceScaleFactor: 1.75,
   disabled: false,
 };
+
+const lighthouseAuditEntrySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  score: z.number().nullable(),
+  scoreDisplayMode: z.string().optional(),
+  displayValue: z.string().optional(),
+  numericValue: z.number().optional(),
+});
+
+const lighthouseCategoryEntrySchema = z.object({
+  score: z.number().nullable(),
+  auditRefs: z.array(z.object({ id: z.string() })),
+});
+
+const lighthouseLhrPartsSchema = z.object({
+  audits: z.record(z.string(), lighthouseAuditEntrySchema),
+  categories: z.record(z.string(), lighthouseCategoryEntrySchema),
+});
+
+function parseLighthouseResults(lhr: unknown): {
+  audits: Record<string, LighthouseAudit>;
+  categories: Record<string, LighthouseCategory>;
+} {
+  const result = lighthouseLhrPartsSchema.safeParse(lhr);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    const detail = issue ? `${issue.path.join(".") || "root"}: ${issue.message}` : "unknown";
+    throw new RunnerError(`Unexpected Lighthouse result shape: ${detail}`);
+  }
+  // Cast is safe: the Zod schema validates the shape; the mismatch is a TypeScript
+  // exactOptionalPropertyTypes artefact (Zod infers `string | undefined` for optional
+  // fields, the interfaces declare only `string`).
+  return result.data as {
+    audits: Record<string, LighthouseAudit>;
+    categories: Record<string, LighthouseCategory>;
+  };
+}
 
 interface LighthousePresetSettings {
   formFactor: "desktop" | "mobile";
@@ -230,8 +270,7 @@ async function runLighthouse(
     }
 
     const { lhr } = result;
-    const audits = lhr.audits as Record<string, LighthouseAudit>;
-    const categories = lhr.categories as Record<string, LighthouseCategory>;
+    const { audits, categories } = parseLighthouseResults(lhr);
 
     const metrics = extractMetrics(audits, categories);
     const auditCategoryMap = buildAuditCategoryMap(categories);
@@ -257,6 +296,7 @@ async function runLighthouse(
 export {
   runLighthouse,
   mapLighthouseAuditToFinding,
+  parseLighthouseResults,
   extractMetrics,
   buildAuditCategoryMap,
   buildLighthouseConfig,

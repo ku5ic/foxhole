@@ -3,6 +3,7 @@ import path from "node:path";
 import url from "node:url";
 
 import type { Page } from "playwright";
+import { z } from "zod";
 
 import { RunnerError } from "../errors.js";
 import { catalogLookup } from "./catalog-lookup.js";
@@ -27,6 +28,36 @@ interface AxeViolation {
 interface AxeNode {
   target: string[];
   html: string;
+}
+
+const axeNodeSchema = z.object({
+  target: z.array(z.string()),
+  html: z.string(),
+});
+
+const axeViolationSchema = z.object({
+  id: z.string(),
+  impact: z.string().optional(),
+  description: z.string(),
+  help: z.string(),
+  helpUrl: z.string(),
+  tags: z.array(z.string()),
+  nodes: z.array(axeNodeSchema),
+});
+
+const axeViolationsSchema = z.array(axeViolationSchema);
+
+function parseAxeViolations(raw: unknown): AxeViolation[] {
+  const result = axeViolationsSchema.safeParse(raw);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    const detail = issue ? `${issue.path.join(".") || "root"}: ${issue.message}` : "unknown";
+    throw new RunnerError(`Unexpected axe-core output shape: ${detail}`);
+  }
+  // Cast is safe: the Zod schema validates the shape; the mismatch is a TypeScript
+  // exactOptionalPropertyTypes artefact (Zod infers `string | undefined` for optional
+  // fields, the interface declares only `string`).
+  return result.data as AxeViolation[];
 }
 
 const SEVERITY_MAP: Record<string, Severity> = {
@@ -138,7 +169,7 @@ async function runAxe(page: Page, pageUrl: string): Promise<AxeRunnerResult> {
       })()
     `);
 
-    const violations = rawViolations as AxeViolation[];
+    const violations = parseAxeViolations(rawViolations);
     const findings = violations.flatMap((violation) =>
       mapAxeViolationToFindings(violation, pageUrl),
     );
@@ -149,5 +180,5 @@ async function runAxe(page: Page, pageUrl: string): Promise<AxeRunnerResult> {
   }
 }
 
-export { runAxe, mapAxeViolationToFindings, sanitizeSelector };
+export { runAxe, mapAxeViolationToFindings, parseAxeViolations, sanitizeSelector };
 export type { AxeRunnerResult, AxeViolation, AxeNode };

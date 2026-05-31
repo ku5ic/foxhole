@@ -6,9 +6,11 @@ import { describe, it, expect, vi } from "vitest";
 
 import {
   mapAxeViolationToFindings,
+  parseAxeViolations,
   sanitizeSelector,
   type AxeViolation,
 } from "../../src/runner/axe.js";
+import { RunnerError } from "../../src/errors.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
@@ -264,5 +266,40 @@ describe("mapAxeViolationToFindings - fixture round-trip", () => {
       expect(finding.source).toBeNull();
       expect(finding.url).toBe(PAGE_URL);
     }
+  });
+});
+
+describe("parseAxeViolations", () => {
+  const validViolation = {
+    id: "image-alt",
+    impact: "critical",
+    description: "Ensures img elements have alternate text",
+    help: "Images must have alternate text",
+    helpUrl: "https://dequeuniversity.com/rules/axe/4.10/image-alt",
+    tags: ["wcag2a"],
+    nodes: [{ target: ["img"], html: "<img>" }],
+  };
+
+  it("accepts a valid violations array", () => {
+    const result = parseAxeViolations([validViolation]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe("image-alt");
+  });
+
+  it("accepts an empty array", () => {
+    expect(parseAxeViolations([])).toEqual([]);
+  });
+
+  it("throws RunnerError when input is not an array", () => {
+    expect(() => parseAxeViolations({ violations: [] })).toThrow(RunnerError);
+  });
+
+  it("throws RunnerError when a violation is missing required fields", () => {
+    expect(() => parseAxeViolations([{ id: "foo" }])).toThrow(RunnerError);
+  });
+
+  it("throws RunnerError when nodes entries are missing required fields", () => {
+    const bad = { ...validViolation, nodes: [{ html: "<img>" }] };
+    expect(() => parseAxeViolations([bad])).toThrow(RunnerError);
   });
 });
