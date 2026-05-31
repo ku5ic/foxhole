@@ -55,7 +55,7 @@ Runs an audit against a URL, a list of URLs, or a local build directory.
 Options:
   --url           Single target URL
   --urls          Comma-separated list of URLs or paths (SPA routes)
-  --build         Path to a static build directory, spins up a local server
+  --build         Path to a static build directory, spins up a local server (requires --urls)
   --checks        Subset of checks to run: perf, a11y, semantic, bundle (default: all)
   --output        Output format: json | markdown (default: markdown)
   --out           File path for output (default: stdout)
@@ -67,11 +67,10 @@ Options:
 
 ### `foxhole compare`
 
-Diffs two saved audit results. Shows regressions, improvements, and net score delta.
+Diffs two saved audit results and outputs the diff as JSON. Shows regressions, improvements, and net score delta.
 
 ```bash
 foxhole compare ./before.json ./after.json
-foxhole compare ./before.json ./after.json --output markdown
 ```
 
 ### `foxhole report`
@@ -80,7 +79,7 @@ Renders a report from a saved JSON result without re-running the audit.
 
 ```bash
 foxhole report ./audit.json
-foxhole report ./audit.json --output markdown --out ./report.md
+foxhole report ./audit.json --output markdown
 ```
 
 ### `foxhole init`
@@ -97,7 +96,7 @@ Creates a `foxhole.config.json` in the current directory.
   "urls": ["/login", "/dashboard", "/settings"],
   "checks": ["perf", "a11y", "semantic"],
   "output": "json",
-  "out": "./audits",
+  "out": "./audit.json",
   "threshold": 80
 }
 ```
