@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildBundleFindings,
+  classifyByContent,
   classifyResource,
   detectFramework,
   filterNomoduleResources,
@@ -695,6 +696,101 @@ describe("detectFramework", () => {
       "https://example.com/_app/immutable/entry/start.abc123.js",
     ]);
     expect(result).toBe("SvelteKit");
+  });
+});
+
+describe("classifyByContent", () => {
+  it("returns 'framework' for a body containing the React error-link prefix", () => {
+    expect(classifyByContent("...Minified React error #321;...")).toBe("framework");
+  });
+
+  it("returns 'framework' for a body containing the React internal sentinel", () => {
+    expect(classifyByContent("e.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED=t")).toBe(
+      "framework",
+    );
+  });
+
+  it("returns 'framework' for a body containing the Vue 3 app property key", () => {
+    expect(classifyByContent("container.__vue_app__=app")).toBe("framework");
+  });
+
+  it("returns 'framework' for a body containing the SvelteKit runtime prefix", () => {
+    expect(classifyByContent("window.__sveltekit_abc123={}")).toBe("framework");
+  });
+
+  it("returns null for generic application code with no framework signature", () => {
+    expect(classifyByContent('function greet(name){return"Hello "+name}export{greet}')).toBeNull();
+  });
+
+  it("returns null for a body that contains 'react' but not a framework signature", () => {
+    // The string 'react' alone is not a signature; only the specific error-link prefix is.
+    expect(classifyByContent('var react=require("react")')).toBeNull();
+  });
+
+  it("returns null for an empty string", () => {
+    expect(classifyByContent("")).toBeNull();
+  });
+});
+
+describe("buildBundleFindings with pre-classified kind", () => {
+  it("counts a pre-classified framework chunk toward frameworkBytes in the total-JS description", () => {
+    // Simulates the content-classification path: a hashed Next.js chunk that
+    // classifyByContent identified as framework is passed in with kind: 'framework'.
+    const findings = buildBundleFindings(
+      [
+        {
+          url: "https://example.com/_next/static/chunks/0z_s30ati0q4r.js",
+          size: 400 * KB,
+          kind: "framework",
+        },
+        {
+          url: "https://example.com/_next/static/chunks/page-abc123.js",
+          size: 200 * KB,
+          kind: "application",
+        },
+      ],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
+    expect(match?.description).toContain("400.0 KB framework");
+    expect(match?.description).toContain("200.0 KB application");
+    expect(match?.description).not.toContain("breakdown is not available");
+  });
+
+  it("tags an oversized pre-classified framework chunk as kind framework with the framework recommendation", () => {
+    const findings = buildBundleFindings(
+      [
+        {
+          url: "https://example.com/_next/static/chunks/0z_s30ati0q4r.js",
+          size: 250 * KB,
+          kind: "framework",
+        },
+      ],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/large-javascript-chunk");
+    expect(match?.kind).toBe("framework");
+    expect(match?.recommendation).toContain("framework chunk");
+  });
+
+  it("falls back to URL classification when kind is absent", () => {
+    // ResourceInfo without kind -- the URL-pattern path still produces the breakdown.
+    const findings = buildBundleFindings(
+      [
+        jsResource("https://example.com/_next/static/chunks/framework-abc.js", 350 * KB),
+        jsResource("https://example.com/_next/static/chunks/page-abc.js", 200 * KB),
+      ],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
+    expect(match?.description).toContain("350.0 KB framework");
+    expect(match?.description).toContain("200.0 KB application");
   });
 });
 

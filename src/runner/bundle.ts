@@ -13,6 +13,7 @@ interface BundleRunnerResult {
 interface ResourceInfo {
   url: string;
   size: number;
+  kind?: "framework" | "application";
 }
 
 const JS_CONTENT_TYPES = ["application/javascript", "text/javascript"];
@@ -23,6 +24,9 @@ const MAX_TOTAL_CSS_BYTES = 100 * 1024;
 // Cap on how many bytes we buffer when Content-Length is absent.
 // Prevents OOM from unexpectedly large responses with no size header.
 const MAX_BODY_BUFFER_BYTES = 10 * 1024 * 1024;
+// Body prefix scanned for content signatures. Framework runtime markers appear throughout
+// minified bundles; 64 KB covers the preamble where bundler module definitions concentrate.
+const CONTENT_SCAN_BYTES = 65_536;
 
 function isContentType(response: PlaywrightResponse, types: string[]): boolean {
   const contentType = response.headers()["content-type"] ?? "";
@@ -126,6 +130,46 @@ function detectFramework(urls: string[]): string | null {
   return null;
 }
 
+// String literals that survive minification and are specific to a framework's runtime source.
+// These appear in the framework's own bundle, not in app code that merely imports the framework,
+// because minifiers preserve string literals and property keys even when mangling variable names.
+// Angular is intentionally omitted: its Ivy function names (ɵɵdefineComponent) also appear in
+// compiled app components, making them unreliable for chunk-level classification.
+const FRAMEWORK_CONTENT_SIGNATURES = [
+  "Minified React error #", // React error URL prefix, emitted many times in react-dom prod builds
+  "__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED", // React internal sentinel (property key)
+  "__vue_app__", // Vue 3 app instance property key, set only inside createApp mount logic
+  "__sveltekit_", // SvelteKit runtime global prefix, not present in Svelte component code
+] as const;
+
+function classifyByContent(bodyText: string): "framework" | null {
+  return FRAMEWORK_CONTENT_SIGNATURES.some((sig) => bodyText.includes(sig)) ? "framework" : null;
+}
+
+// Reads the response body once and uses it for both size measurement and content-signature
+// classification. For URL-matched framework chunks the body is not read (URL fast-path);
+// for unmatched chunks the body is unavoidable because content scanning requires it.
+async function measureJsWithClassification(
+  response: PlaywrightResponse,
+  url: string,
+): Promise<ResourceInfo> {
+  const urlKind = classifyResource(url);
+
+  if (urlKind === "framework") {
+    const size = await measureResourceSize(response);
+    return { url, size, kind: "framework" };
+  }
+
+  // Read the body once for decoded size and content classification.
+  // This bypasses the Content-Length shortcut for unmatched JS chunks, but the body
+  // is required for the scan and provides the same decoded-size accuracy.
+  const body = await response.body();
+  const size = Math.min(body.length, MAX_BODY_BUFFER_BYTES);
+  const scan = body.subarray(0, CONTENT_SCAN_BYTES).toString("utf8");
+  const kind = classifyByContent(scan) ?? "application";
+  return { url, size, kind };
+}
+
 function buildBundleFindings(
   jsResources: ResourceInfo[],
   cssResources: ResourceInfo[],
@@ -141,7 +185,7 @@ function buildBundleFindings(
     const entry = catalogLookup(ruleId);
     const detail = formatKb(totalJs);
     const frameworkBytes = jsResources
-      .filter((r) => classifyResource(r.url) === "framework")
+      .filter((r) => (r.kind ?? classifyResource(r.url)) === "framework")
       .reduce((sum, r) => sum + r.size, 0);
     const detectedFramework =
       frameworkBytes === 0 ? detectFramework(jsResources.map((r) => r.url)) : null;
@@ -186,7 +230,7 @@ function buildBundleFindings(
       const entry = catalogLookup(ruleId);
       const sanitized = sanitizeResourceUrl(resource.url);
       const detail = resource.url;
-      const kind = classifyResource(resource.url);
+      const kind = resource.kind ?? classifyResource(resource.url);
       const recommendation =
         kind === "framework"
           ? FRAMEWORK_CHUNK_RECOMMENDATION
@@ -333,10 +377,14 @@ async function runBundleChecks(
 
       if (!isJs && !isCss) return;
 
-      const size = await measureResourceSize(response);
-
-      if (isJs) jsResources.push({ url: responseUrl, size });
-      if (isCss) cssResources.push({ url: responseUrl, size });
+      if (isJs) {
+        const resource = await measureJsWithClassification(response, responseUrl);
+        jsResources.push(resource);
+        if (isCss) cssResources.push({ url: responseUrl, size: resource.size });
+      } else {
+        const size = await measureResourceSize(response);
+        cssResources.push({ url: responseUrl, size });
+      }
     } catch (err) {
       // body may not be available for redirects or certain resource types; non-fatal
       if (!quiet) {
@@ -374,6 +422,7 @@ export {
   runBundleChecks,
   buildBundleFindings,
   classifyResource,
+  classifyByContent,
   detectFramework,
   filterNomoduleResources,
   sanitizeResourceUrl,
