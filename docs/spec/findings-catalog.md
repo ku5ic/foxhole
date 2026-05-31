@@ -34,10 +34,14 @@ Each sub-catalog exports a `Record<string, CatalogEntry>` with the sub-catalog's
 ```typescript
 interface CatalogEntry {
   rule_id: string;
-  title_template: string;
+  source: "axe" | "lighthouse" | "semantic" | "bundle";
+  vendor_rule_id: string | null;
+  category: CheckCategory;
   default_severity: Severity;
   default_effort: Effort;
   wcag: string | null;
+  title_template: string;
+  description_template: string;
   recommendation: string;
 }
 ```
@@ -55,12 +59,24 @@ The stable identifier for this rule. Format: `{category}/{slug}`. Examples:
 
 Must match the `rule_id` field used by the runner that produces this finding. The catalog map is keyed by `rule_id`.
 
+**`source`**
+
+Which runner produced the finding: `"axe"`, `"lighthouse"`, `"semantic"`, or `"bundle"`. Set to the sub-catalog's scope literal. Used downstream to distinguish framework findings from application findings in scoring and reporting.
+
+**`vendor_rule_id`**
+
+The upstream rule identifier as the vendor names it (e.g. the axe-core rule ID `"color-contrast"`, the Lighthouse audit ID `"render-blocking-resources"`). Set to `null` for custom checks (semantic, bundle) that have no upstream vendor rule. Used for linking to vendor documentation.
+
+**`category`**
+
+The `CheckCategory` this finding belongs to: `"a11y"`, `"perf"`, `"semantic"`, or `"bundle"`. Drives score grouping and report section placement.
+
 **`title_template`**
 
-Short label, sentence case, no trailing period, under 60 characters. This becomes `Finding.title` and `Fix.title`.
+Short sentence, sentence case, no trailing period, under 80 characters. This becomes `Finding.title` and `Fix.title`.
 
-Good: `"Image missing alt text"`
-Bad: `"Images must have alternative text (WCAG 1.1.1)."` (jargon, period, too long)
+Good: `"Images must have alternative text"`
+Bad: `"Images must have alternative text (WCAG 1.1.1)."` (WCAG jargon in title, trailing period)
 
 **`default_severity`**
 
@@ -89,6 +105,13 @@ Effort is implementation complexity, not time. Use the effort table from the fin
 Short clause format: `"1.1.1"`, `"2.4.7"`. Set to `null` for non-a11y rules.
 
 Map from axe-core rule IDs to WCAG clauses using the axe-core tags array. The tag format is `wcag{level}{clause}`, e.g. `wcag2aa`, `wcag111`. Only populate WCAG for `a11y` category entries.
+
+**`description_template`**
+
+One sentence explaining what the problem is. Rendered in the detail section of the finding. Complements `title_template` (which names the rule) with context about why it matters. Starts with a noun phrase or subject.
+
+Good: `"Images without alt text are invisible to screen reader users."`
+Bad: `"This is a WCAG violation."` (too generic, no context)
 
 **`recommendation`**
 
@@ -150,7 +173,7 @@ These apply to all user-facing strings in the catalog and must be enforced in co
 
 - Plain ASCII punctuation only. No em dashes, no smart quotes.
 - No WCAG jargon in `title_template` or `recommendation`. "Images must have alternative text" not "SC 1.1.1 non-text content failure".
-- `title_template` is a label, not a sentence. No trailing period.
+- `title_template` is a short sentence, sentence case, no trailing period.
 - `recommendation` starts with a verb. "Add", "Remove", "Split", "Replace", "Update".
 - No passive voice in `recommendation`. "Add alt text to each image" not "Alt text should be added".
 
@@ -158,30 +181,38 @@ These apply to all user-facing strings in the catalog and must be enforced in co
 
 ## Catalog sub-module structure
 
-Each sub-module imports only primitive types from `../types/index.js`. It does not import from `catalog/index.ts` to avoid circular dependencies. The structural check happens at the spread site in `index.ts`.
+Each sub-module imports `CheckCategory`, `Effort`, and `Severity` from `../types/index.js`. It does not import from `catalog/index.ts` to avoid circular dependencies. The structural check happens at the spread site in `index.ts`.
 
 ```typescript
 // axe.ts pattern
-import type { Effort, Severity } from "../types/index.js";
+import type { CheckCategory, Effort, Severity } from "../types/index.js";
 
 interface AxeCatalogEntry {
   rule_id: string;
-  title_template: string;
+  source: "axe";
+  vendor_rule_id: string | null;
+  category: CheckCategory;
   default_severity: Severity;
   default_effort: Effort;
   wcag: string | null;
+  title_template: string;
+  description_template: string;
   recommendation: string;
 }
 
 const axeCatalog: Record<string, AxeCatalogEntry> = {
   "a11y/image-alt": {
     rule_id: "a11y/image-alt",
-    title_template: "Image missing alt text",
+    source: "axe",
+    vendor_rule_id: "image-alt",
+    category: "a11y",
     default_severity: "critical",
     default_effort: "low",
     wcag: "1.1.1",
+    title_template: "Images must have alternative text",
+    description_template: "Images without alt text are invisible to screen reader users.",
     recommendation:
-      'Add descriptive alt text to each image. Use empty alt="" for decorative images.',
+      'Add a descriptive alt attribute to each image, or alt="" for decorative images.',
   },
   // ...
 };
