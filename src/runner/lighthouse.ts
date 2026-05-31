@@ -236,6 +236,7 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
     wcag: null,
     impact: null,
     source: null,
+    kind: null,
     url: pageUrl,
   };
 }

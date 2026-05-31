@@ -26,6 +26,7 @@ const findingSchema = z.object({
   wcag: z.string().nullable(),
   impact: z.string().nullable(),
   source: sourceLocationSchema.nullable(),
+  kind: z.enum(["framework", "application"]).nullable(),
   url: z.string(),
 });
 

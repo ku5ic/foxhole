@@ -105,6 +105,7 @@ function buildBundleFindings(
       wcag: null,
       impact: null,
       source: null,
+      kind: null,
       url: pageUrl,
     });
   }
@@ -135,6 +136,7 @@ function buildBundleFindings(
         wcag: null,
         impact: null,
         source: null,
+        kind: null,
         url: pageUrl,
       });
     }
@@ -165,6 +167,7 @@ function buildBundleFindings(
       wcag: null,
       impact: null,
       source: null,
+      kind: null,
       url: pageUrl,
     });
   }
@@ -191,6 +194,7 @@ function buildBundleFindings(
       wcag: null,
       impact: null,
       source: null,
+      kind: null,
       url: pageUrl,
     });
   }

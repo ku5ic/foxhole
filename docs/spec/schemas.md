@@ -61,15 +61,17 @@ export interface Finding {
   wcag: string | null; // e.g. "1.4.3" for color contrast, null if not applicable
   impact: string | null; // short impact statement from vendor (axe especially), null if absent
   source: SourceLocation | null; // resolved post-runner, null if resolution failed or disabled
+  kind: "framework" | "application" | null; // bundle only: JS chunk origin; null for all other findings
   url: string; // canonical URL of the page on which this finding was raised
 }
 ```
 
-Three additions over the v1 spec's draft schema:
+Four additions over the v1 spec's draft schema:
 
 1. `rule_id` is now explicit. The architecture spec requires it for catalog lookup; making it part of the schema makes it queryable from consumers.
 2. `source` is the new field for source map resolution.
 3. `id` is now defined as a stable hash, specified in section 2.
+4. `kind` classifies `bundle/large-javascript-chunk` findings as `"framework"` or `"application"` based on the chunk URL. All other findings carry `null`. The total-JS finding (`bundle/total-js-size`) also carries `null` because the total spans both origins. Populated by the bundle runner; all other runners set it to `null`.
 
 ### 1.4 Fix
 

@@ -138,6 +138,7 @@ function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: strin
       wcag: null,
       impact: null,
       source: null,
+      kind: null,
       url: pageUrl,
     };
   });

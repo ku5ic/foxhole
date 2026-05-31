@@ -21,6 +21,7 @@ const validFinding = {
   wcag: "1.3.1",
   impact: "serious",
   source: null,
+  kind: null,
   url: "https://example.com",
 };
 
