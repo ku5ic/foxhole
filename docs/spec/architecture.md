@@ -205,7 +205,7 @@ The execution per page is two passes:
 
 > **Implementation status:** Pass 1 currently runs sequentially (a11y, then perf, then semantic, then bundle), not in parallel. Concurrent Pass 1 execution is the target design for a later phase.
 
-**Pass 1:** axe, semantic, and bundle run against the loaded page. They share the same `Page` instance. Bundle analysis reads from the network log captured during the initial navigation. Target design is to run these concurrently.
+**Pass 1:** axe and semantic run against the loaded page and share the same `Page` instance. Bundle runs on its own dedicated `Page`, performs its own navigation with `waitUntil: "networkidle"`, and attaches its own response listener to capture network traffic -- it does not share the loaded page or read a log from the initial navigation. The target design is to run axe, semantic, and bundle concurrently once the bundle isolation is no longer needed, but in the current implementation they run sequentially.
 
 **Pass 2:** Lighthouse runs against the same `Page`. Lighthouse will trigger its own navigation and reload internally; this is acceptable because pass 1 has already completed.
 
@@ -387,23 +387,21 @@ Documented in section 10 of the v1 spec. The implementation guarantees:
 When `--build` is used:
 
 1. Orchestrator calls `server/static.ts` to start a server pointed at the build directory
-2. Server selects a port: tries 3000, 3001, ... up to 3999, falls back to OS-assigned ephemeral port
-3. Server is started, returns its port number
+2. Server binds an OS-assigned ephemeral port via `listen(0, "127.0.0.1")`
+3. Server is started, returns its URL
 4. Orchestrator constructs target URLs by joining the server URL with the paths from `--urls`
 5. Audit runs as normal
 6. Orchestrator calls server shutdown after the report is assembled
 
-The server is a Node `http` module instance with a small handler. No `serve-handler` or Express dependency. Static file serving plus SPA fallback is 50 lines of code.
+The server uses Node's `http` module with `serve-handler` v6.1.7 as the request handler, configured with only `{ public: absolutePath }`. No additional options are set.
 
-### 8.2 SPA fallback
+### 8.2 File serving behavior
 
-Default behavior: if a request resolves to a file inside the build directory, serve it. Otherwise, serve `index.html` if it exists. Otherwise, 404.
-
-This matches the standard SPA hosting model. It can be disabled in v1.1 if a real use case emerges; v1 ships with fallback always on.
+`serve-handler` serves files found under the `public` directory. Requests for paths that do not map to an existing file receive a 404 (or a directory listing for directory paths, unless overridden). SPA fallback (rewriting unknown paths to `index.html`) is not configured and is not active. If your build requires SPA routing, the paths passed to `--urls` must correspond to static files or the audit will receive 404 responses.
 
 ### 8.3 Security
 
-The server binds to `127.0.0.1` only, never `0.0.0.0`. The port is random within the configured range. Requests are scoped to the build directory; path traversal (`..` segments) is rejected. The server is up only for the duration of the audit run.
+The server binds to `127.0.0.1` only, never `0.0.0.0`. The port is an OS-assigned ephemeral port. Path scoping and traversal prevention are provided by `serve-handler`'s path normalization relative to the `public` directory. The server is up only for the duration of the audit run.
 
 This is a local development tool. It is not designed for hostile networks.
 
@@ -527,7 +525,7 @@ The six open questions from section 17 of the v1 spec, resolved:
 
 1. **MCP server invocation: subcommand or separate binary?** Subcommand. `foxhole mcp` launches the server. Single entry point, single distribution.
 
-2. **Internal static server: Node `http` module or `serve-handler`?** Node `http` module. The handler is small enough that the dependency is not justified.
+2. **Internal static server: Node `http` module or `serve-handler`?** `serve-handler` v6.1.7, wrapping Node's `http` module. The handler is configured with `{ public: absolutePath }` only.
 
 3. **Source map resolution library: `source-map` or `@jridgewell/trace-mapping`?** `@jridgewell/trace-mapping`. Faster, actively maintained, broadly adopted.
 
