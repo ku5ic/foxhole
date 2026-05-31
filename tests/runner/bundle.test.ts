@@ -149,6 +149,21 @@ describe("total-js-size rule", () => {
     const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
     expect(match?.kind).toBeNull();
   });
+
+  it("shows exact KB values in the framework/app breakdown", () => {
+    const findings = buildBundleFindings(
+      [
+        jsResource("https://example.com/_next/static/chunks/framework-abc.js", 400 * KB),
+        jsResource("https://example.com/assets/app-abc.js", 200 * KB),
+      ],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
+    expect(match?.description).toContain("400.0 KB framework");
+    expect(match?.description).toContain("200.0 KB application");
+  });
 });
 
 describe("large-javascript-chunk rule", () => {
@@ -635,5 +650,35 @@ describe("all four rules produce well-formed findings", () => {
       expect(f.wcag).toBeNull();
       expect(f.impact).toBeNull();
     }
+  });
+
+  it("total-js-size, total-css-size, and insecure-resource carry kind: null", () => {
+    const findings = buildBundleFindings(
+      [jsResource("https://example.com/a.js", MB)],
+      [cssResource("https://example.com/a.css", 150 * KB)],
+      ["http://cdn.example.com/x.js"],
+      PAGE_URL,
+    );
+    const nullKindRules = [
+      "bundle/total-js-size",
+      "bundle/total-css-size",
+      "bundle/insecure-resource",
+    ];
+    for (const ruleId of nullKindRules) {
+      const f = findings.find((x) => x.rule_id === ruleId);
+      expect(f, `${ruleId} finding should exist`).toBeDefined();
+      expect(f?.kind, `${ruleId} kind should be null`).toBeNull();
+    }
+  });
+
+  it("large-javascript-chunk on an app URL carries kind: application", () => {
+    const findings = buildBundleFindings(
+      [jsResource("https://example.com/assets/app.js", 250 * KB)],
+      [],
+      [],
+      PAGE_URL,
+    );
+    const f = findings.find((x) => x.rule_id === "bundle/large-javascript-chunk");
+    expect(f?.kind).toBe("application");
   });
 });
