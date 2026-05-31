@@ -37,6 +37,28 @@ describe("resolveRunOptions - concurrency", () => {
   });
 });
 
+describe("resolveRunOptions - excludeFramework", () => {
+  it("defaults to false when neither flag nor config provide a value", () => {
+    const result = resolveRunOptions({});
+    expect(result.excludeFramework).toBe(false);
+  });
+
+  it("uses the flag value when provided", () => {
+    const result = resolveRunOptions({ excludeFramework: true });
+    expect(result.excludeFramework).toBe(true);
+  });
+
+  it("uses the config value when the flag is absent", () => {
+    const result = resolveRunOptions({}, { exclude_framework: true });
+    expect(result.excludeFramework).toBe(true);
+  });
+
+  it("flag takes priority over the config value", () => {
+    const result = resolveRunOptions({ excludeFramework: false }, { exclude_framework: true });
+    expect(result.excludeFramework).toBe(false);
+  });
+});
+
 describe("resolveRunOptions - defaults", () => {
   it("uses default checks when none are provided", () => {
     const result = resolveRunOptions({});

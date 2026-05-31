@@ -60,4 +60,21 @@ describe("foxholeConfigSchema", () => {
     const result = foxholeConfigSchema.safeParse({ threshold: 80, unknownKey: true });
     expect(result.success).toBe(false);
   });
+
+  it("accepts exclude_framework: true", () => {
+    const result = foxholeConfigSchema.safeParse({ exclude_framework: true });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.exclude_framework).toBe(true);
+  });
+
+  it("defaults exclude_framework to false when absent", () => {
+    const result = foxholeConfigSchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.exclude_framework).toBe(false);
+  });
+
+  it("rejects a non-boolean exclude_framework", () => {
+    const result = foxholeConfigSchema.safeParse({ exclude_framework: "yes" });
+    expect(result.success).toBe(false);
+  });
 });

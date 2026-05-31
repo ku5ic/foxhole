@@ -10,4 +10,5 @@ export interface RunOptions {
   throttling?: string;
   concurrency?: number;
   quiet?: boolean;
+  excludeFramework?: boolean;
 }

@@ -1,6 +1,11 @@
 import type { PageResult } from "../types/index.js";
 
-function summarizeReport(pages: PageResult[], score: number, passed: boolean): string {
+function summarizeReport(
+  pages: PageResult[],
+  score: number,
+  passed: boolean,
+  excludeFramework: boolean = false,
+): string {
   const pageCount = pages.length;
   const allFindings = pages.flatMap((p) => p.findings);
   const criticalCount = allFindings.filter((f) => f.severity === "critical").length;
@@ -35,6 +40,10 @@ function summarizeReport(pages: PageResult[], score: number, passed: boolean): s
     parts.push(
       `${String(erroredCount)} check runner ${erroredCount === 1 ? "error" : "errors"} occurred.`,
     );
+  }
+
+  if (excludeFramework) {
+    parts.push("Framework findings were excluded from scoring (--exclude-framework).");
   }
 
   return parts.join(" ");
