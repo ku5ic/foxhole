@@ -20,14 +20,12 @@ interface BuildAuditOptions {
 }
 
 async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport> {
-  for (const url of options.urls) {
-    validateUrl(url);
-  }
+  const normalizedUrls = options.urls.map(validateUrl);
 
   const startTime = Date.now();
 
   const rawPages = await runAudit({
-    urls: options.urls,
+    urls: normalizedUrls,
     checks: options.checks,
     quiet: options.quiet,
     throttling: options.throttling,
@@ -57,7 +55,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
       audited_at: new Date(startTime).toISOString(),
       input_mode: options.inputMode,
       checks_run: options.checks,
-      page_count: options.urls.length,
+      page_count: normalizedUrls.length,
       duration_ms: durationMs,
       threshold: options.threshold ?? null,
       passed,

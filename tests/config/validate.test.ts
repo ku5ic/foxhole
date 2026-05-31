@@ -9,17 +9,23 @@ import {
 import { ConfigError } from "../../src/errors.js";
 
 describe("validateUrl", () => {
-  it("accepts an http URL", () => {
-    expect(validateUrl("http://example.com")).toBe("http://example.com");
+  it("accepts an http URL and returns the normalized form", () => {
+    expect(validateUrl("http://example.com")).toBe("http://example.com/");
   });
 
-  it("accepts an https URL", () => {
+  it("accepts an https URL with a path and preserves it", () => {
     expect(validateUrl("https://example.com/path?q=1")).toBe("https://example.com/path?q=1");
   });
 
-  it("returns the original string unchanged", () => {
+  it("returns the normalized string for a URL that is already canonical", () => {
     const url = "https://staging.example.com/app";
-    expect(validateUrl(url)).toBe(url);
+    expect(validateUrl(url)).toBe("https://staging.example.com/app");
+  });
+
+  it("strips embedded credentials from the returned URL", () => {
+    const result = validateUrl("http://user:pass@example.com/");
+    expect(result).not.toContain("user:pass@");
+    expect(result).toContain("example.com");
   });
 
   it("rejects a file: URL", () => {

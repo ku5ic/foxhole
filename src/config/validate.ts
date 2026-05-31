@@ -19,7 +19,10 @@ function validateUrl(raw: string): string {
       `URL protocol "${parsed.protocol}" is not allowed; only http and https are supported`,
     );
   }
-  return raw;
+  // Strip credentials so they never appear in report output or stderr.
+  parsed.username = "";
+  parsed.password = "";
+  return parsed.toString();
 }
 
 function validateChecks(raw: string[]): CheckCategory[] {
