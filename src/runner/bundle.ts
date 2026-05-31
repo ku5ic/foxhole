@@ -73,11 +73,10 @@ function sanitizeResourceUrl(rawUrl: string): string {
 // Framework bytes count toward the score (real execution cost), but the recommendation
 // differs because the developer cannot split or remove these chunks directly.
 const FRAMEWORK_URL_PATTERNS = [
-  "/_next/static/chunks/framework-", // Next.js React + framework runtime
-  "/_next/static/chunks/main-", // Next.js main entry
+  "/_next/static/chunks/framework", // Next.js React + framework runtime (dev: framework.js, prod: framework-[hash].js)
+  "/_next/static/chunks/main-", // Next.js main entry (prod only; dev emits main.js which is a page bundle)
   "/_next/static/chunks/pages/_app", // Next.js app shell
-  "/_next/static/chunks/webpack-", // Next.js webpack runtime
-  "/_next/static/chunks/react-", // Next.js externalized React (newer builds)
+  "/_next/static/chunks/webpack", // Next.js webpack runtime (dev: webpack.js, prod: webpack-[hash].js)
   "/static/js/runtime-main", // Create React App runtime
   "/node_modules/.vite/", // Vite pre-bundled deps
   "/assets/vendor-", // Vite convention: node_modules split chunk

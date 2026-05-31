@@ -198,6 +198,9 @@ function renderFindings(findings: Finding[]): string {
         "",
       );
 
+      if (finding.description) {
+        lines.push(sanitizeMarkdownText(finding.description), "");
+      }
       if (finding.selector) {
         lines.push(`**Selector:** \`${finding.selector}\``);
       }

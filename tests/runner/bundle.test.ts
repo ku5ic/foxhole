@@ -443,8 +443,14 @@ describe("hasPathExtension (BUN-2)", () => {
 });
 
 describe("classifyResource", () => {
-  it("classifies a Next.js framework chunk as framework", () => {
+  it("classifies a Next.js framework chunk as framework (production)", () => {
     expect(classifyResource("https://example.com/_next/static/chunks/framework-abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a Next.js framework chunk as framework (dev, no hash)", () => {
+    expect(classifyResource("https://example.com/_next/static/chunks/framework.js")).toBe(
       "framework",
     );
   });
@@ -461,8 +467,14 @@ describe("classifyResource", () => {
     );
   });
 
-  it("classifies a Next.js webpack runtime as framework", () => {
+  it("classifies a Next.js webpack runtime as framework (production)", () => {
     expect(classifyResource("https://example.com/_next/static/chunks/webpack-abc123.js")).toBe(
+      "framework",
+    );
+  });
+
+  it("classifies a Next.js webpack runtime as framework (dev, no hash)", () => {
+    expect(classifyResource("https://example.com/_next/static/chunks/webpack.js")).toBe(
       "framework",
     );
   });
@@ -483,9 +495,9 @@ describe("classifyResource", () => {
     expect(classifyResource("https://example.com/assets/vendor-abc123.js")).toBe("framework");
   });
 
-  it("classifies a Next.js externalized React chunk as framework", () => {
+  it("classifies a Next.js react-prefixed app chunk as application (not framework)", () => {
     expect(classifyResource("https://example.com/_next/static/chunks/react-abc123.js")).toBe(
-      "framework",
+      "application",
     );
   });
 
