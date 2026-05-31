@@ -1,5 +1,5 @@
 import { RunnerError, formatErrorChain } from "../errors.js";
-import { createBrowser, createPage, waitForPageReady, extractCdpPort } from "./browser.js";
+import { createBrowser, createPage, waitForPageReady } from "./browser.js";
 import { runAxe } from "./axe.js";
 import { runLighthouse } from "./lighthouse.js";
 import type { ThrottlingPreset } from "./lighthouse.js";
@@ -78,7 +78,7 @@ async function auditSinglePage(url: string, options: RunnerOptions): Promise<Pag
   log(`Auditing ${url}`, options.quiet);
 
   try {
-    const { browser, server } = await createBrowser();
+    const { browser, server, cdpPort } = await createBrowser();
     try {
       const page = await createPage(browser);
       let metrics = emptyMetrics();
@@ -110,8 +110,7 @@ async function auditSinglePage(url: string, options: RunnerOptions): Promise<Pag
       if (options.checks.includes("perf")) {
         log("Running performance checks", options.quiet);
         try {
-          const port = extractCdpPort(server.wsEndpoint());
-          const lighthouseResult = await runLighthouse(url, port, options.throttling);
+          const lighthouseResult = await runLighthouse(url, cdpPort, options.throttling);
           metrics = { ...metrics, ...lighthouseResult.metrics };
           findings.push(...lighthouseResult.findings);
         } catch (error) {

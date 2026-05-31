@@ -1,3 +1,5 @@
+import net from "node:net";
+
 import { chromium } from "playwright";
 import type { Browser, BrowserServer, Page } from "playwright";
 
@@ -7,18 +9,48 @@ const DEFAULT_VIEWPORT = { width: 1280, height: 800 };
 const DEFAULT_NAV_TIMEOUT_MS = 30_000;
 const NETWORK_IDLE_BUFFER_MS = 500;
 
-// Returns both the Playwright browser and the BrowserServer so callers can
-// extract the CDP port (via server.wsEndpoint()) for Lighthouse and close the
-// server process after audit work is complete.
-async function createBrowser(): Promise<{ browser: Browser; server: BrowserServer }> {
+// Asks the OS for a free TCP port by binding to :0 and reading back the
+// assigned port. The probe closes before Chrome binds, so there is a small
+// TOCTOU window; under concurrency > 1 with perf checks the existing warning
+// already nudges users toward concurrency 1.
+async function findFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      if (address === null || typeof address === "string") {
+        probe.close(() => reject(new RunnerError("Could not determine free port")));
+        return;
+      }
+      const { port } = address;
+      probe.close((err) => {
+        if (err) {
+          reject(new RunnerError("Failed to close port probe", err));
+        } else {
+          resolve(port);
+        }
+      });
+    });
+    probe.on("error", (err) => reject(new RunnerError("Failed to probe for free port", err)));
+  });
+}
+
+// Returns the Playwright browser, the BrowserServer (needed for server.close()),
+// and the Chrome CDP port that Lighthouse should connect to.
+async function createBrowser(): Promise<{
+  browser: Browser;
+  server: BrowserServer;
+  cdpPort: number;
+}> {
   let server: BrowserServer | undefined;
   try {
+    const cdpPort = await findFreePort();
     server = await chromium.launchServer({
       headless: true,
-      args: ["--disable-dev-shm-usage"],
+      args: ["--disable-dev-shm-usage", `--remote-debugging-port=${cdpPort}`],
     });
     const browser = await chromium.connect(server.wsEndpoint());
-    return { browser, server };
+    return { browser, server, cdpPort };
   } catch (cause) {
     try {
       await server?.close();
@@ -27,22 +59,6 @@ async function createBrowser(): Promise<{ browser: Browser; server: BrowserServe
     }
     throw new RunnerError("Failed to launch browser", cause);
   }
-}
-
-// Parses the CDP port out of a Playwright browser server wsEndpoint URL.
-// Format: ws://127.0.0.1:<port>/devtools/browser/<uuid>
-function extractCdpPort(wsEndpoint: string): number {
-  let parsed: URL;
-  try {
-    parsed = new URL(wsEndpoint);
-  } catch {
-    throw new RunnerError(`Cannot parse browser wsEndpoint: ${wsEndpoint}`);
-  }
-  const port = Number.parseInt(parsed.port, 10);
-  if (!Number.isFinite(port) || port <= 0) {
-    throw new RunnerError(`Browser wsEndpoint has no usable CDP port: ${wsEndpoint}`);
-  }
-  return port;
 }
 
 async function createPage(browser: Browser): Promise<Page> {
@@ -66,5 +82,5 @@ async function waitForPageReady(page: Page): Promise<void> {
   }
 }
 
-export { createBrowser, createPage, waitForPageReady, extractCdpPort };
+export { findFreePort, createBrowser, createPage, waitForPageReady };
 export type { BrowserServer } from "playwright";

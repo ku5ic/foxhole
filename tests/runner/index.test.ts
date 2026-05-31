@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { runAudit, runWithConcurrency } from "../../src/runner/index.js";
 import { createBrowser, createPage } from "../../src/runner/browser.js";
 import { runAxe } from "../../src/runner/axe.js";
+import { runLighthouse } from "../../src/runner/lighthouse.js";
 import { runSemanticChecks } from "../../src/runner/semantic.js";
 import { RunnerError } from "../../src/errors.js";
 
@@ -10,7 +11,6 @@ vi.mock("../../src/runner/browser.js", () => ({
   createBrowser: vi.fn(),
   createPage: vi.fn(),
   waitForPageReady: vi.fn(() => Promise.resolve()),
-  extractCdpPort: vi.fn(() => 9222),
 }));
 
 vi.mock("../../src/runner/axe.js", () => ({
@@ -119,6 +119,7 @@ describe("runAudit - navigation failure", () => {
       .mockResolvedValueOnce({
         browser: makeFakeBrowser() as never,
         server: makeFakeBrowserServer() as never,
+        cdpPort: 9222,
       });
 
     const results = await runAudit({
@@ -170,6 +171,7 @@ describe("runAudit - per-category error isolation", () => {
     vi.mocked(createBrowser).mockResolvedValue({
       browser: makeFakeBrowser() as never,
       server: makeFakeBrowserServer() as never,
+      cdpPort: 9222,
     });
   });
 
@@ -250,6 +252,7 @@ describe("runAudit - duration_ms", () => {
     vi.mocked(createBrowser).mockResolvedValue({
       browser: makeFakeBrowser() as never,
       server: makeFakeBrowserServer() as never,
+      cdpPort: 9222,
     });
   });
 
@@ -286,6 +289,7 @@ describe("runAudit - perf-noise warning", () => {
     vi.mocked(createBrowser).mockResolvedValue({
       browser: makeFakeBrowser() as never,
       server: makeFakeBrowserServer() as never,
+      cdpPort: 9222,
     });
   });
 
@@ -334,6 +338,20 @@ describe("runAudit - perf-noise warning", () => {
       String(args[0]).includes("--concurrency > 1"),
     );
     expect(perfWarningCalls).toHaveLength(0);
+  });
+
+  it("passes cdpPort from createBrowser to runLighthouse", async () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await runAudit({
+      urls: ["https://example.com"],
+      checks: ["perf"],
+      quiet: true,
+      throttling: "desktop",
+      concurrency: 1,
+    });
+
+    expect(vi.mocked(runLighthouse)).toHaveBeenCalledWith("https://example.com", 9222, "desktop");
   });
 });
 
