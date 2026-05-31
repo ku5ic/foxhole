@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Browser, BrowserServer, Page } from "playwright";
+import type { Browser, Page } from "playwright";
 
 import {
   createBrowser,
@@ -84,7 +84,7 @@ describe("extractCdpPort", () => {
   });
 
   it("extracts a non-default port correctly", () => {
-    expect(extractCdpPort("ws://127.0.0.1:54321/devtools/browser/xyz")).toBe(54321);
+    expect(extractCdpPort("ws://127.0.0.1:54321/devtools/browser/xyz")).toBe(54_321);
   });
 
   it("throws RunnerError when the endpoint is not a valid URL", () => {

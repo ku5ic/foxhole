@@ -366,7 +366,7 @@ describe("runWithConcurrency", () => {
   });
 
   it("returns an empty array for an empty URL list", async () => {
-    const results = await runWithConcurrency([], 3, async (url) => url);
+    const results = await runWithConcurrency([], 3, (url) => Promise.resolve(url));
     expect(results).toEqual([]);
   });
 
@@ -375,11 +375,11 @@ describe("runWithConcurrency", () => {
     let inFlight = 0;
     const urls = ["a"];
 
-    await runWithConcurrency(urls, 5, async (url) => {
+    await runWithConcurrency(urls, 5, (url) => {
       inFlight++;
       peakInFlight = Math.max(peakInFlight, inFlight);
       inFlight--;
-      return url;
+      return Promise.resolve(url);
     });
 
     expect(peakInFlight).toBe(1);

@@ -67,4 +67,4 @@ async function waitForPageReady(page: Page): Promise<void> {
 }
 
 export { createBrowser, createPage, waitForPageReady, extractCdpPort };
-export type { BrowserServer };
+export type { BrowserServer } from "playwright";

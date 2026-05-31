@@ -467,7 +467,7 @@ describe("parseLighthouseResults", () => {
   it("accepts a valid lhr structure", () => {
     const result = parseLighthouseResults(validLhr);
     expect(result.audits["largest-contentful-paint"]).toBeDefined();
-    expect(result.categories["performance"]).toBeDefined();
+    expect(result.categories.performance).toBeDefined();
   });
 
   it("accepts empty audits and categories records", () => {

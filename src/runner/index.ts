@@ -182,7 +182,7 @@ async function runWithConcurrency(
   fn: (url: string) => Promise<PageResult>,
 ): Promise<PageResult[]> {
   if (urls.length === 0) return [];
-  const results = new Array<PageResult>(urls.length);
+  const results = Array.from<PageResult>({ length: urls.length });
   let nextIndex = 0;
 
   const worker = async (): Promise<void> => {

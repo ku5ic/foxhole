@@ -180,5 +180,5 @@ async function runAxe(page: Page, pageUrl: string): Promise<AxeRunnerResult> {
   }
 }
 
-export { runAxe, mapAxeViolationToFindings, parseAxeViolations, sanitizeSelector };
+export { runAxe, mapAxeViolationToFindings, parseAxeViolations };
 export type { AxeRunnerResult, AxeViolation, AxeNode };
