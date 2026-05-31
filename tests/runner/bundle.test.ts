@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildBundleFindings,
+  filterNomoduleResources,
   hasPathExtension,
   measureResourceSize,
   sanitizeResourceUrl,
@@ -338,6 +339,69 @@ describe("hasPathExtension (BUN-2)", () => {
 
   it("handles non-parseable URLs without throwing", () => {
     expect(() => hasPathExtension("not-a-url.js", ".js")).not.toThrow();
+  });
+});
+
+describe("filterNomoduleResources", () => {
+  it("returns the original array unchanged when nomoduleUrls is empty", () => {
+    const resources = [
+      jsResource("https://example.com/a.js", 300 * KB),
+      jsResource("https://example.com/b.js", 200 * KB),
+    ];
+    expect(filterNomoduleResources(resources, new Set())).toBe(resources);
+  });
+
+  it("removes a resource whose URL is in the nomodule set", () => {
+    const resources = [
+      jsResource("https://example.com/main.js", 400 * KB),
+      jsResource("https://example.com/polyfills-abc123.js", 110 * KB),
+    ];
+    const result = filterNomoduleResources(
+      resources,
+      new Set(["https://example.com/polyfills-abc123.js"]),
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]?.url).toBe("https://example.com/main.js");
+  });
+
+  it("removes all resources when every URL is in the nomodule set", () => {
+    const resources = [jsResource("https://example.com/polyfills-abc123.js", 110 * KB)];
+    const result = filterNomoduleResources(
+      resources,
+      new Set(["https://example.com/polyfills-abc123.js"]),
+    );
+    expect(result).toHaveLength(0);
+  });
+
+  it("keeps resources whose URLs are not in the nomodule set", () => {
+    const resources = [
+      jsResource("https://example.com/chunk-a.js", 300 * KB),
+      jsResource("https://example.com/chunk-b.js", 250 * KB),
+    ];
+    const result = filterNomoduleResources(
+      resources,
+      new Set(["https://example.com/polyfills-abc123.js"]),
+    );
+    expect(result).toHaveLength(2);
+  });
+
+  it("a nomodule polyfill does not push total JS over the threshold after filtering", () => {
+    const resources = [
+      jsResource("https://example.com/framework.js", 420 * KB),
+      jsResource("https://example.com/polyfills-abc123.js", 110 * KB),
+    ];
+    const nomodule = new Set(["https://example.com/polyfills-abc123.js"]);
+    const filtered = filterNomoduleResources(resources, nomodule);
+    const findings = buildBundleFindings(filtered, [], [], PAGE_URL);
+    expect(findings.filter((f) => f.rule_id === "bundle/total-js-size")).toHaveLength(0);
+  });
+
+  it("a nomodule polyfill is also excluded from the large-chunk check", () => {
+    const resources = [jsResource("https://example.com/polyfills-abc123.js", 210 * KB)];
+    const nomodule = new Set(["https://example.com/polyfills-abc123.js"]);
+    const filtered = filterNomoduleResources(resources, nomodule);
+    const findings = buildBundleFindings(filtered, [], [], PAGE_URL);
+    expect(findings.filter((f) => f.rule_id === "bundle/large-javascript-chunk")).toHaveLength(0);
   });
 });
 

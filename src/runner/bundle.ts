@@ -210,6 +210,25 @@ function deduplicateResources(resources: ResourceInfo[]): ResourceInfo[] {
   return [...seen.values()];
 }
 
+function filterNomoduleResources(
+  resources: ResourceInfo[],
+  nomoduleUrls: ReadonlySet<string>,
+): ResourceInfo[] {
+  if (nomoduleUrls.size === 0) return resources;
+  return resources.filter((r) => !nomoduleUrls.has(r.url));
+}
+
+async function collectNomoduleUrls(page: Page): Promise<Set<string>> {
+  try {
+    const urls: string[] = await page.evaluate(
+      `Array.from(document.querySelectorAll('script[nomodule][src]')).map(el => el.src)`,
+    );
+    return new Set(urls);
+  } catch {
+    return new Set();
+  }
+}
+
 async function runBundleChecks(
   page: Page,
   pageUrl: string,
@@ -259,7 +278,8 @@ async function runBundleChecks(
     throw new RunnerError(`Failed to load page for bundle analysis: ${pageUrl}`, cause);
   }
 
-  const uniqueJs = deduplicateResources(jsResources);
+  const nomoduleUrls = await collectNomoduleUrls(page);
+  const uniqueJs = filterNomoduleResources(deduplicateResources(jsResources), nomoduleUrls);
   const uniqueCss = deduplicateResources(cssResources);
   const uniqueHttp = [...new Set(httpResources)];
 
@@ -275,6 +295,7 @@ async function runBundleChecks(
 export {
   runBundleChecks,
   buildBundleFindings,
+  filterNomoduleResources,
   sanitizeResourceUrl,
   hasPathExtension,
   measureResourceSize,

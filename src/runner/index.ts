@@ -84,7 +84,7 @@ function runLighthouseQueued(
   throttling: ThrottlingPreset,
 ): Promise<LighthouseRunnerResult> {
   const entry = lighthouseQueueTail.then(() => runLighthouse(url, cdpPort, throttling));
-  lighthouseQueueTail = entry.catch(() => undefined);
+  lighthouseQueueTail = entry.catch(() => null);
   return entry;
 }
 
