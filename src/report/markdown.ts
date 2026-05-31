@@ -192,8 +192,9 @@ function renderFindings(findings: Finding[]): string {
     );
 
     for (const finding of sorted) {
+      const kindTag = finding.kind === "framework" ? " (framework)" : "";
       lines.push(
-        `#### [${finding.severity.charAt(0).toUpperCase()}${finding.severity.slice(1)}] ${sanitizeMarkdownText(finding.title)}`,
+        `#### [${finding.severity.charAt(0).toUpperCase()}${finding.severity.slice(1)}] ${sanitizeMarkdownText(finding.title)}${kindTag}`,
         "",
       );
 
