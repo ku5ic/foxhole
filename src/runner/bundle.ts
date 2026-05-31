@@ -8,6 +8,7 @@ import type { Finding } from "../types/index.js";
 interface BundleRunnerResult {
   findings: Finding[];
   bundle_size: number | null;
+  framework_bundle_size: number | null;
 }
 
 interface ResourceInfo {
@@ -187,11 +188,12 @@ function buildBundleFindings(
     const frameworkBytes = jsResources
       .filter((r) => (r.kind ?? classifyResource(r.url)) === "framework")
       .reduce((sum, r) => sum + r.size, 0);
-    const detectedFramework =
-      frameworkBytes === 0 ? detectFramework(jsResources.map((r) => r.url)) : null;
+    const detectedFramework = detectFramework(jsResources.map((r) => r.url));
+    const frameworkLabel =
+      detectedFramework === null ? "framework" : `${detectedFramework} framework`;
     let totalJsDescription: string;
     if (frameworkBytes > 0) {
-      totalJsDescription = `Total JavaScript transferred is ${detail} (${formatKb(frameworkBytes)} framework, ${formatKb(totalJs - frameworkBytes)} application), which exceeds the 500 KB threshold.`;
+      totalJsDescription = `Total JavaScript transferred is ${detail} (${formatKb(frameworkBytes)} ${frameworkLabel}, ${formatKb(totalJs - frameworkBytes)} application), which exceeds the 500 KB threshold.`;
     } else if (detectedFramework === null) {
       totalJsDescription = `Total JavaScript transferred is ${detail}, which exceeds the 500 KB threshold.`;
     } else {
@@ -411,10 +413,14 @@ async function runBundleChecks(
 
   const findings = buildBundleFindings(uniqueJs, uniqueCss, uniqueHttp, pageUrl);
   const totalJs = uniqueJs.reduce((sum, r) => sum + r.size, 0);
+  const frameworkJs = uniqueJs
+    .filter((r) => (r.kind ?? classifyResource(r.url)) === "framework")
+    .reduce((sum, r) => sum + r.size, 0);
 
   return {
     findings,
     bundle_size: totalJs > 0 ? totalJs : null,
+    framework_bundle_size: frameworkJs > 0 ? frameworkJs : null,
   };
 }
 

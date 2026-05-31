@@ -163,7 +163,7 @@ describe("total-js-size rule", () => {
       PAGE_URL,
     );
     const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
-    expect(match?.description).toContain("400.0 KB framework");
+    expect(match?.description).toContain("400.0 KB Next.js framework");
     expect(match?.description).toContain("200.0 KB application");
   });
 
@@ -197,7 +197,7 @@ describe("total-js-size rule", () => {
     );
     const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
     expect(match?.description).not.toContain("breakdown is not available");
-    expect(match?.description).toContain("400.0 KB framework");
+    expect(match?.description).toContain("400.0 KB Next.js framework");
   });
 
   it("uses the plain description for a non-framework app (no root pattern match, no framework bytes)", () => {
@@ -754,7 +754,7 @@ describe("buildBundleFindings with pre-classified kind", () => {
       PAGE_URL,
     );
     const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
-    expect(match?.description).toContain("400.0 KB framework");
+    expect(match?.description).toContain("400.0 KB Next.js framework");
     expect(match?.description).toContain("200.0 KB application");
     expect(match?.description).not.toContain("breakdown is not available");
   });
@@ -789,7 +789,7 @@ describe("buildBundleFindings with pre-classified kind", () => {
       PAGE_URL,
     );
     const match = findings.find((f) => f.rule_id === "bundle/total-js-size");
-    expect(match?.description).toContain("350.0 KB framework");
+    expect(match?.description).toContain("350.0 KB Next.js framework");
     expect(match?.description).toContain("200.0 KB application");
   });
 });

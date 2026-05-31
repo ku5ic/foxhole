@@ -60,6 +60,7 @@ const validPage = {
     performance_score: 85,
     accessibility_score: 72,
     bundle_size: 425_000,
+    framework_bundle_size: null,
   },
   audited_at: "2026-04-07T12:00:00.000Z",
   duration_ms: 6200,

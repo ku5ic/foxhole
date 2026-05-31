@@ -130,7 +130,8 @@ export interface PerformanceMetrics {
   tbt: number | null; // milliseconds
   performance_score: number | null; // 0-100 from Lighthouse, null if perf check did not run
   accessibility_score: number | null; // 0-100 from Lighthouse a11y, separate from Foxhole a11y score
-  bundle_size: number | null; // total transferred bytes, null if bundle check did not run
+  bundle_size: number | null; // total JS transferred bytes, null if bundle check did not run
+  framework_bundle_size: number | null; // framework-classified JS bytes; null if none classified or bundle check did not run
 }
 ```
 
@@ -138,7 +139,7 @@ Every field is nullable because every field can be missing for a legitimate reas
 
 `accessibility_score` is Lighthouse's own a11y score, captured as a metric for completeness. It is not the score Foxhole computes for the `a11y` category, which is derived from finding severity and count via `audit/score.ts`. Consumers comparing the two scores should expect divergence; the rendering layer surfaces both.
 
-`bundle_size` is transferred bytes per the v1 spec decision. Decoded and gzipped sizes are not reported. If a future version adds them, they go on a new structured `BundleBreakdown` object, not as additional top-level fields.
+`bundle_size` is total transferred JS bytes. `framework_bundle_size` is the subset classified as framework (by URL pattern or content signature). Application bytes are derived as `bundle_size - framework_bundle_size` where both are non-null. Decoded and gzipped sizes are not reported. If a future version adds them, they go on a new structured `BundleBreakdown` object, not as additional top-level fields.
 
 ### 1.7 PageResult
 

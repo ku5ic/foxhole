@@ -182,6 +182,7 @@ function extractMetrics(
         ? null
         : Math.round(categories.accessibility.score * 100),
     bundle_size: null,
+    framework_bundle_size: null,
   };
 }
 

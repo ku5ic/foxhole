@@ -63,6 +63,7 @@ const performanceMetricsSchema = z.object({
   performance_score: z.number().nullable(),
   accessibility_score: z.number().nullable(),
   bundle_size: z.number().nullable(),
+  framework_bundle_size: z.number().nullable(),
 });
 
 const pageResultSchema = z
