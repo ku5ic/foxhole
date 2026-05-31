@@ -1,5 +1,10 @@
-import { DEFAULT_CHECKS, DEFAULT_OUTPUT, DEFAULT_THROTTLING } from "./defaults.js";
-import { validateChecks, validateThreshold } from "./validate.js";
+import {
+  DEFAULT_CHECKS,
+  DEFAULT_CONCURRENCY,
+  DEFAULT_OUTPUT,
+  DEFAULT_THROTTLING,
+} from "./defaults.js";
+import { validateChecks, validateConcurrency, validateThreshold } from "./validate.js";
 import { ConfigError } from "../errors.js";
 import type { FoxholeConfig } from "./schema.js";
 import type { CheckCategory } from "../types/index.js";
@@ -10,6 +15,7 @@ interface ResolvedRunOptions {
   threshold: number | undefined;
   outputFormat: "json" | "markdown";
   throttling: ThrottlingPreset;
+  concurrency: number;
   out: string | undefined;
 }
 
@@ -21,6 +27,7 @@ function resolveRunOptions(
     threshold?: number;
     output?: string;
     throttling?: string;
+    concurrency?: number;
     out?: string;
   },
   config?: FoxholeConfig,
@@ -51,10 +58,14 @@ function resolveRunOptions(
   }
   const throttling = rawThrottling as ThrottlingPreset;
 
+  // concurrency: flag wins; if absent fall back to config, then default
+  const rawConcurrency = rawOptions.concurrency ?? config?.concurrency ?? DEFAULT_CONCURRENCY;
+  const concurrency = validateConcurrency(rawConcurrency);
+
   // out: flag wins; if absent fall back to config
   const out = rawOptions.out ?? config?.out;
 
-  return { checks, threshold, outputFormat, throttling, out };
+  return { checks, threshold, outputFormat, throttling, concurrency, out };
 }
 
 export { resolveRunOptions };

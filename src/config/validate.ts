@@ -43,4 +43,11 @@ function validateThreshold(raw: number): number {
   return raw;
 }
 
-export { validateUrl, validateChecks, validateThreshold };
+function validateConcurrency(raw: number): number {
+  if (!Number.isInteger(raw) || raw < 1) {
+    throw new ConfigError(`--concurrency must be a positive integer (got ${String(raw)})`);
+  }
+  return raw;
+}
+
+export { validateUrl, validateChecks, validateThreshold, validateConcurrency };

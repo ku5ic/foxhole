@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { validateUrl, validateChecks, validateThreshold } from "../../src/config/validate.js";
+import {
+  validateUrl,
+  validateChecks,
+  validateThreshold,
+  validateConcurrency,
+} from "../../src/config/validate.js";
 import { ConfigError } from "../../src/errors.js";
 
 describe("validateUrl", () => {
@@ -88,5 +93,31 @@ describe("validateThreshold", () => {
 
   it("rejects Infinity", () => {
     expect(() => validateThreshold(Infinity)).toThrow(ConfigError);
+  });
+});
+
+describe("validateConcurrency", () => {
+  it("accepts 1", () => {
+    expect(validateConcurrency(1)).toBe(1);
+  });
+
+  it("accepts a positive integer greater than 1", () => {
+    expect(validateConcurrency(4)).toBe(4);
+  });
+
+  it("rejects 0", () => {
+    expect(() => validateConcurrency(0)).toThrow(ConfigError);
+  });
+
+  it("rejects a negative integer", () => {
+    expect(() => validateConcurrency(-1)).toThrow(ConfigError);
+  });
+
+  it("rejects a non-integer", () => {
+    expect(() => validateConcurrency(1.5)).toThrow(ConfigError);
+  });
+
+  it("error message names the bad value", () => {
+    expect(() => validateConcurrency(0)).toThrow(/0/);
   });
 });

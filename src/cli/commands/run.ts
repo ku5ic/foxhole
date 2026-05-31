@@ -71,6 +71,7 @@ function registerRunCommand(program: Command): void {
     .option("--config <path>", "path to foxhole.config.json")
     .option("--threshold <n>", "fail if score drops below this value", Number.parseFloat)
     .option("--throttling <preset>", "Lighthouse throttling preset: desktop, mobile, or none")
+    .option("--concurrency <n>", "number of URLs to audit in parallel", Number.parseInt)
     .option("--quiet", "suppress progress output")
     .addHelpText(
       "after",
@@ -127,7 +128,7 @@ async function handleRun(options: RunOptions): Promise<void> {
     throw error;
   }
 
-  const { checks, threshold, outputFormat, throttling, out } = resolved;
+  const { checks, threshold, outputFormat, throttling, concurrency, out } = resolved;
   const quiet = options.quiet ?? false;
 
   let server: StaticServer | null = null;
@@ -147,9 +148,9 @@ async function handleRun(options: RunOptions): Promise<void> {
       threshold,
       throttling,
       inputMode: mode,
-      concurrency: 1, // becomes a real option in a later phase
-      perfRuns: 1, // becomes a real option in a later phase
-      sourceMaps: "auto", // becomes a real option in a later phase
+      concurrency,
+      perfRuns: 1,
+      sourceMaps: "auto",
     });
   } finally {
     if (server) await server.close();

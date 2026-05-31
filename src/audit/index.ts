@@ -31,6 +31,7 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
     checks: options.checks,
     quiet: options.quiet,
     throttling: options.throttling,
+    concurrency: options.concurrency,
   });
 
   const scoredPages = rawPages.map((page) => scorePage(page, options.checks));
