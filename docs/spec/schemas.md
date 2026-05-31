@@ -197,7 +197,7 @@ Three changes from the v1 spec draft:
 
 `dependencies` is the audit trail for "did this finding regress because the code regressed, or because axe got smarter". Without it, run comparison across time becomes unreliable.
 
-`exclude_framework` records whether framework findings were excluded from score computation during this run. A score of 85 with `exclude_framework: true` is not directly comparable to a score of 85 with `exclude_framework: false`; the diff command surfaces this as a comparability note.
+`exclude_framework` records whether framework findings were excluded from score computation during this run. A score of 85 with `exclude_framework: true` is not directly comparable to a score of 85 with `exclude_framework: false`; consumers comparing two reports should check this field before treating the scores as equivalent.
 
 ### 1.9 AuditReport
 
