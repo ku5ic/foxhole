@@ -19,7 +19,7 @@ Open items carried into Phase 2:
 ## Phase 0: Foundation hardening
 
 **Spec:** `docs/phases/phase-0.md`
-**Status:** Active
+**Status:** Complete
 
 ### Objectives
 

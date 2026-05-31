@@ -128,7 +128,9 @@ Exit codes:
 
 ## MCP server
 
-Foxhole includes an MCP server that exposes audit capabilities as tools callable by any MCP-compatible AI agent, including Claude Code.
+> **Note:** The `foxhole mcp` command is planned for Phase 6 and is not available in the current release. The MCP tool definitions exist in the codebase but the CLI subcommand has not been wired up yet.
+
+Foxhole will include an MCP server that exposes audit capabilities as tools callable by any MCP-compatible AI agent, including Claude Code.
 
 ```bash
 foxhole mcp
