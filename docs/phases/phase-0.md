@@ -1,6 +1,6 @@
 # Phase 0: Foundation hardening
 
-**Status:** Active
+**Status:** Complete
 **Depends on:** Initial scaffold (all 25 tests passing, clean typecheck and lint)
 **Blocks:** Phase 1 (core runners cannot be built on an inconsistent error handling base)
 

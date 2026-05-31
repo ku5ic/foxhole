@@ -6,7 +6,7 @@ This document is the canonical roadmap for Foxhole v1.0.0. It describes what eac
 
 ## Current state
 
-Phase 0 and Phase 1 are complete. 205 tests pass. All four runners produce schema-valid `Finding[]` with stable IDs. The catalog drives titles, severities, and effort estimates. The audit layer scores, prioritizes, and diffs correctly.
+Phase 0 and Phase 1 are complete. All tests pass. All four runners produce schema-valid `Finding[]` with stable IDs. The catalog drives titles, severities, and effort estimates. The audit layer scores, prioritizes, and diffs correctly.
 
 Open items carried into Phase 2:
 
@@ -50,7 +50,7 @@ Open items carried into Phase 2:
 ### Delivered
 
 - Zod runtime schema in `src/types/schema.ts`; all TypeScript types derived via `z.infer`
-- Findings catalog in `src/catalog/` with 48 entries covering axe-core, Lighthouse, semantic, and bundle rules
+- Findings catalog in `src/catalog/` with 61 entries: 25 axe-core, 25 Lighthouse, 7 semantic, 4 bundle
 - `src/runner/finding-id.ts`: stable 16-hex-char finding IDs via sha256 of page URL, rule ID, semantic path, and text fingerprint
 - All four runners produce `Finding[]` validated against the `Finding` type with catalog-backed titles, severities, and effort estimates
 - `audit/score.ts` enforces the length-4 categories invariant: every `PageResult.categories` has exactly 4 entries (ok, errored, or skipped)
@@ -58,6 +58,7 @@ Open items carried into Phase 2:
 - `audit/prioritize.ts` groups fixes by `rule_id` with catalog titles and stable sort
 - `audit/diff.ts` computes `comparable` from `perf_profile` and dependency major-version changes
 - `RunMeta.dependencies` populated from installed package versions at runtime
+- Framework bundle classification: `src/runner/bundle.ts` detects framework vs. application JS via URL patterns and content signatures; `PerformanceMetrics.framework_bundle_size` records the framework subset; `--exclude-framework` flag omits framework findings from scoring (`RunMeta.exclude_framework`). See ADR-011.
 
 ### Deferred from Phase 1
 
