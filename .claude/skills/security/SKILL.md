@@ -1,10 +1,17 @@
+---
+name: security
+description: Security patterns specific to foxhole's attack surface. Use whenever working in code that handles user-supplied URLs, file paths, config values, or axe-core selectors, OR the user asks about input validation, Playwright sandboxing, or output sanitization in this project.
+metadata:
+  type: project
+---
+
 # Skill: Security patterns
 
 Foxhole accepts user-supplied URLs, file paths, and config values. Every external input is a potential attack surface. These patterns apply to every module that touches user input.
 
 ## URL validation
 
-Always validate URLs before passing them to Playwright. Use the built-in URL constructor, do not write custom regex.
+Always validate URLs before passing them to Playwright. Use the built-in `URL` constructor -- do not write custom regex.
 
 ```typescript
 function validateUrl(input: string): string {
@@ -24,12 +31,7 @@ function validateUrl(input: string): string {
 }
 ```
 
-Never allow:
-
-- `file://` URLs. Use `--build` mode for local files.
-- `javascript:` URLs.
-- `data:` URLs.
-- Non-HTTP protocols.
+Never allow: `file://`, `javascript:`, `data:`, or any non-HTTP/HTTPS protocol.
 
 ## File path validation
 
@@ -53,49 +55,27 @@ async function validateOutputPath(input: string): Promise<string> {
 }
 ```
 
-Never:
-
-- Use user-supplied paths in shell commands.
-- Allow path traversal: validate that resolved paths stay within expected boundaries where relevant.
-- Trust that a directory exists without checking.
+Never use user-supplied paths in shell commands. Never assume a directory exists without checking.
 
 ## Selector sanitization
 
-Selectors from axe-core appear in report output. Sanitize before rendering.
+Selectors from axe-core appear in report output. Always call `sanitizeSelector` from `src/runner/sanitize.ts` before storing or rendering any axe-core selector.
 
-```typescript
-function sanitizeSelector(selector: string): string {
-  return selector.replace(/[<>]/g, "").slice(0, 200);
-}
-```
+`sanitizeSelector` removes `<`, `>`, and backtick characters and truncates to 200 characters. These are the characters that break markdown rendering.
 
 ## Config validation
 
-All config values are validated through the Zod schema in src/config/schema.ts before use. Never access raw config values directly.
+All config values pass through the Zod schema in `src/config/schema.ts` before use. Never access raw config values directly.
 
-```typescript
-const configSchema = z.object({
-  url: z.string().url().optional(),
-  urls: z.array(z.string()).optional(),
-  build: z.string().optional(),
-  checks: z.array(z.enum(["perf", "a11y", "semantic", "bundle"])).optional(),
-  output: z.enum(["json", "markdown", "pdf"]).optional(),
-  out: z.string().optional(),
-  threshold: z.number().min(0).max(100).optional(),
-});
-```
-
-## JSON output
+## JSON output rules
 
 - Never include raw error messages or stack traces in JSON output.
 - Never include environment variables or system paths in output.
-- The `meta` field includes platform and Node version for debugging. This is intentional and acceptable.
+- `meta.platform` and `meta.node_version` are intentional and acceptable for debugging.
 
 ## Playwright sandboxing
 
-- Always launch Chromium with `--no-sandbox` disabled in CI environments only.
-- Do not pass user-supplied strings as JavaScript to `page.evaluate()`.
-- Set a reasonable navigation timeout. Default to 30 seconds.
+Set a reasonable navigation timeout. Always pass `--disable-dev-shm-usage` for CI compatibility.
 
 ```typescript
 const browser = await chromium.launch({
@@ -106,16 +86,44 @@ const page = await browser.newPage();
 await page.setDefaultNavigationTimeout(30_000);
 ```
 
+Pass `--no-sandbox` only in CI environments where the default Chromium sandbox cannot run. Never pass it in development or when auditing untrusted content. Do not treat it as a default.
+
+Do not pass user-supplied strings as JavaScript to `page.evaluate()`.
+
 ## Dependency hygiene
 
 - Run `npm audit` before every release.
-- Pin major versions of Playwright, axe-core, and Lighthouse in package.json.
-- Do not install dependencies that are not used.
+- Pin major versions of Playwright, axe-core, and Lighthouse in `package.json`.
+- Do not install dependencies that are unused.
 
-## What never belongs in output
+## Anti-patterns
 
-- Stack traces in user-facing error messages.
-- Internal file paths.
-- Environment variable values.
-- API keys or tokens of any kind.
-- Raw axe-core or Lighthouse output that has not been normalized.
+**failure**: Passing a user-supplied URL to Playwright without calling `validateUrl` first. An unvalidated `javascript:` URL would execute arbitrary code in the browser context.
+
+**failure**: Using user-supplied strings in `page.evaluate()`. This is arbitrary code execution.
+
+**failure**: Exposing stack traces in user-facing error messages. Use `error.message` only; let `formatErrorChain` render the cause chain if needed.
+
+**warning**: Using `--no-sandbox` as a default browser launch argument. It disables the Chromium sandbox everywhere, not just in CI.
+
+**warning**: Storing raw axe-core selectors without running `sanitizeSelector`. Backticks and angle brackets in selectors corrupt markdown output.
+
+**info**: Not validating the output file path before writing. A path traversal attack would write the report to an unexpected location.
+
+## When to load this skill
+
+- Any code that accepts or processes user-supplied URLs, file paths, or config values
+- Any code that produces output containing axe-core selectors
+- Reviewing input handling in `src/config/`, `src/cli/`, or `src/runner/`
+
+## When not to load this skill
+
+- Working in `src/audit/`, `src/report/` internals that only consume already-validated data
+- Reviewing scoring or prioritization logic
+
+## References
+
+- `src/runner/sanitize.ts` -- `sanitizeSelector` implementation
+- `src/config/schema.ts` -- Zod config schema
+- `src/config/resolve-options.ts` -- URL and path resolution
+- `docs/spec/v1.md` section 5.3 -- input mode rules and validation requirements

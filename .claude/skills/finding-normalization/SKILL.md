@@ -1,107 +1,161 @@
+---
+name: finding-normalization
+description: Finding normalization rules for foxhole runners. Use whenever working in src/runner/ or src/catalog/, OR the user asks about Finding shape, severity mapping, finding IDs, selector handling, or WCAG extraction.
+metadata:
+  type: project
+---
+
 # Skill: Finding normalization
 
-The `Finding` type is the canonical unit of audit output. All runners produce raw output from Lighthouse or axe-core. That raw output must be normalized into `Finding` objects before leaving the runner layer. This normalization must be consistent, deterministic, and happen in exactly one place per runner.
+The `Finding` type is the canonical unit of audit output. All runners produce raw output from Lighthouse, axe-core, semantic checks, or bundle analysis. That raw output must be normalized into `Finding` objects before leaving the runner layer. Normalization must be consistent, deterministic, and happen in exactly one place per runner.
 
 ## The canonical Finding type
 
 ```typescript
+interface SourceLocation {
+  file: string;
+  line: number;
+  column: number;
+  snippet: string | null;
+}
+
 interface Finding {
   id: string;
   category: CheckCategory;
   severity: Severity;
   effort: Effort;
+  rule_id: string;
   title: string;
   description: string;
   recommendation: string;
   selector: string | null;
   wcag: string | null;
   impact: string | null;
+  source: SourceLocation | null;
+  kind: "framework" | "application" | null;
   url: string;
 }
 ```
 
+`source` is always `null` in all runners (source map integration is deferred). `kind` is only set by the bundle runner (`"framework"` or `"application"`); all other runners set it to `null`.
+
+## Rule ID format
+
+Rule IDs follow `{category}/{engine-rule-id}`:
+
+- axe-core: `a11y/${violation.id}` e.g. `a11y/image-alt`
+- Lighthouse: `perf/${audit.id}` e.g. `perf/render-blocking-resources`
+- Semantic: `semantic/${ruleId}` e.g. `semantic/missing-main`
+- Bundle: `bundle/${ruleId}` e.g. `bundle/large-js-chunk`
+
 ## ID generation
 
-IDs must be stable across runs for the same issue on the same page. Use the format:
+Finding IDs are 16 hex characters -- the first 16 chars of a sha256 hash of four inputs joined by null bytes:
 
 ```
-{category}-{rule-id}
+sha256(`${pageUrl}\0${ruleId}\0${semanticPath}\0${textFingerprint}`).digest("hex").slice(0, 16)
 ```
 
-Examples:
-
-- `a11y-image-alt`
-- `perf-render-blocking-resources`
-- `semantic-missing-main-landmark`
-- `bundle-large-javascript-chunk`
-
-Never use random or timestamp-based IDs. The diff logic depends on stable IDs.
+IDs are page-scoped, not globally unique. Two findings on different pages can share an ID. Never use ID alone as a global key; use `(page_url, id)` pairs. ID changes when markup structure changes (semanticPath is derived from HTML), which can cause false regressions if the page's DOM is refactored.
 
 ## Severity mapping
 
-### From axe-core
+### axe-core
+
+Catalog entry wins when present. Fallback:
 
 | axe-core impact | Foxhole severity |
 | --------------- | ---------------- |
-| critical        | critical         |
-| serious         | critical         |
-| moderate        | major            |
-| minor           | minor            |
+| `critical`      | `critical`       |
+| `serious`       | `critical`       |
+| `moderate`      | `major`          |
+| `minor`         | `minor`          |
+| undefined/other | `major`          |
 
-### From Lighthouse
+### Lighthouse
 
-| Lighthouse category       | Score range    | Foxhole severity                                |
-| ------------------------- | -------------- | ----------------------------------------------- |
-| opportunity or diagnostic | score < 0.5    | critical                                        |
-| opportunity or diagnostic | score 0.5-0.89 | major                                           |
-| opportunity or diagnostic | score >= 0.9   | minor                                           |
-| passed audit              | any            | omit, do not include passing audits as findings |
+Only audits with `scoreDisplayMode` of `"binary"` or `"numeric"` are converted to findings. Catalog entry wins when present. Fallback:
+
+| Score condition      | Foxhole severity |
+| -------------------- | ---------------- |
+| `score === null`     | `critical`       |
+| `score < 0.5`        | `critical`       |
+| `0.5 <= score < 0.9` | `major`          |
+| `score >= 0.9`       | omit (passing)   |
+
+Lighthouse produces no `minor` findings via the fallback path; only catalog overrides can produce minor Lighthouse findings.
 
 ## Effort mapping
 
-Effort is an estimate of implementation complexity, not time. Map as follows:
+Effort is implementation complexity, not calendar time. When no catalog entry exists, use these defaults:
 
-| Finding type                                        | Effort |
-| --------------------------------------------------- | ------ |
-| Missing alt text, missing labels, missing landmarks | low    |
-| Color contrast, focus indicators, heading order     | low    |
-| Render-blocking resources, unused CSS               | medium |
-| LCP image optimization, font loading strategy       | medium |
-| Core Web Vitals requiring architectural changes     | high   |
-| Bundle splitting, lazy loading strategy             | high   |
-| Semantic restructuring of large page sections       | high   |
+| Finding type                                    | Effort   |
+| ----------------------------------------------- | -------- |
+| Missing alt text, labels, landmarks             | `low`    |
+| Color contrast, focus indicators, heading order | `low`    |
+| Render-blocking resources, unused CSS           | `medium` |
+| LCP optimization, font loading strategy         | `medium` |
+| Core Web Vitals requiring architectural changes | `high`   |
+| Bundle splitting, lazy loading strategy         | `high`   |
+| Semantic restructuring of large page sections   | `high`   |
 
-When in doubt, err toward higher effort. Underestimating effort breaks trust with users.
+When uncertain, err toward higher effort.
 
 ## Selector handling
 
-- Use the selector provided by axe-core as-is when available.
-- For Lighthouse findings that do not map to a single element, set `selector` to `null`.
-- Never fabricate selectors. `null` is always preferable to a guess.
-- Truncate selectors longer than 200 characters at a natural boundary.
+- Use `sanitizeSelector(selectorRaw)` from `src/runner/sanitize.ts` on any axe-core selector before storing.
+- `sanitizeSelector` removes `<`, `>`, and backtick characters and truncates to 200 characters.
+- For Lighthouse and semantic findings that do not map to a single element, set `selector` to `null`.
+- Never fabricate selectors.
 
-## WCAG references
+## WCAG extraction
 
-- Only populate `wcag` for `a11y` category findings.
-- Use the short clause format: `"1.1.1"`, `"2.4.7"`, not the full title.
+- Populate `wcag` only for `a11y` category findings.
+- If the catalog entry provides a `wcag` field, use it.
+- Otherwise extract from axe-core's `tags` array: find the first tag matching `/^wcag\d+$/` (e.g. `wcag111`, `wcag2aa`), then split the digit string into `major.minor.clause`.
 - Set `wcag` to `null` for all non-a11y findings.
-- Map from axe-core rule IDs to WCAG clauses using the axe-core tags array. The relevant tag format is `wcag{level}{clause}`, e.g. `wcag2aa`, `wcag111`.
-
-## Impact field
-
-- Populate `impact` only for axe-core findings. It is the raw axe-core impact string.
-- Set `impact` to `null` for all non-axe findings.
 
 ## Text content rules
 
-- `title`: short label, sentence case, no trailing period, under 60 characters
+- `title`: short sentence, sentence case, no trailing period, under 60 characters
 - `description`: what the problem is, one to two sentences, plain language
-- `recommendation`: what to do about it, actionable, starts with a verb, one to three sentences
-- No em dashes, no smart quotes, plain ASCII punctuation only
-- No WCAG jargon in user-facing text. "Images must have alternative text" not "SC 1.1.1 non-text content failure"
+- `recommendation`: what to do, actionable, starts with a verb, one to three sentences
+- No em dashes, no smart quotes, plain ASCII only
+- No WCAG clause references in user-facing text
 
-## What never belongs in normalization
+## Anti-patterns
 
-- Scoring logic. Normalization produces findings. Scoring happens in src/audit/score.ts.
-- Prioritization logic. That happens in src/audit/prioritize.ts.
-- Rendering logic. Findings are data, not formatted output.
+**failure**: Setting `id` to a random value, a timestamp, or a `{category}-{rule-id}` string. IDs must be the sha256-based hash so they remain stable across runs for regression detection.
+
+**failure**: Including passing audits as findings. Lighthouse audits with `score >= 0.9` are omitted. axe-core passes are not reported by the engine.
+
+**failure**: Skipping `sanitizeSelector` before storing an axe-core selector. Raw selectors can contain backticks and angle brackets that break markdown rendering.
+
+**warning**: Setting `kind` on non-bundle findings. Only the bundle runner sets `kind`; all others must set it to `null`.
+
+**warning**: Putting scoring or prioritization logic inside a runner. Normalization produces `Finding[]`. Scoring happens in `src/audit/score.ts`. Prioritization in `src/audit/prioritize.ts`.
+
+**info**: Using catalog fallbacks for well-known rules. If a rule has stable, known effort and severity, add it to the catalog rather than relying on the engine-impact fallback.
+
+## When to load this skill
+
+- Editing any file in `src/runner/`
+- Editing any file in `src/catalog/`
+- Adding a new runner or new rule to the catalog
+- Reviewing Finding construction code
+- Debugging why finding IDs changed between runs
+
+## When not to load this skill
+
+- Working in `src/audit/`, `src/report/`, or `src/cli/` (those layers consume findings, they do not produce them)
+- Adding tests that construct fixture findings (use the schema for reference instead)
+
+## References
+
+- `src/types/schema.ts` -- canonical Zod schema for `Finding` and `SourceLocation`
+- `src/runner/finding-id.ts` -- `computeFindingId`, `buildSemanticPath`, `buildTextFingerprint`
+- `src/runner/sanitize.ts` -- `sanitizeSelector`
+- `src/runner/axe.ts` -- reference implementation of axe normalization
+- `src/runner/lighthouse.ts` -- reference implementation of Lighthouse normalization
+- `docs/spec/schemas.md` section 1.1 -- `Finding` field descriptions
+- `docs/spec/findings-catalog.md` -- catalog entry format and authoring rules

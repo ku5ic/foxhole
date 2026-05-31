@@ -53,9 +53,9 @@ Load the relevant skill before working in each area. Skills contain the decision
 | Any function that can fail                        | error-handling        |
 | Any file in src/cli/commands/                     | cli-command           |
 | Any file in src/mcp/tools/                        | mcp-tool              |
-| Any test file                                     | test-patterns         |
+| Any test file                                     | foxhole-test-patterns |
 | Any code touching URLs, file paths, or user input | security              |
-| src/report/markdown.ts                            | markdown-report       |
+| src/report/markdown.ts                            | report-renderer       |
 
 ## Architecture rules
 
