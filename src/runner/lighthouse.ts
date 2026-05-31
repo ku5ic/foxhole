@@ -1,5 +1,4 @@
 import lighthouse from "lighthouse";
-import { launch } from "chrome-launcher";
 import { z } from "zod";
 
 import { RunnerError } from "../errors.js";
@@ -241,25 +240,15 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
   };
 }
 
-// Lighthouse spawns its own Chrome instance separately from the Playwright browser.
-// Unifying these is deferred debt -- see architecture spec section 13.4.
 async function runLighthouse(
   pageUrl: string,
+  port: number,
   throttling: ThrottlingPreset,
 ): Promise<LighthouseRunnerResult> {
-  let chrome;
-  try {
-    chrome = await launch({
-      chromeFlags: ["--headless=new", "--no-sandbox", "--disable-gpu"],
-    });
-  } catch (cause) {
-    throw new RunnerError("Failed to launch Chrome for Lighthouse", cause);
-  }
-
   try {
     const presetSettings = buildLighthouseConfig(throttling);
     const result = await lighthouse(pageUrl, {
-      port: chrome.port,
+      port,
       output: "json",
       logLevel: "error",
       ...presetSettings,
@@ -288,8 +277,6 @@ async function runLighthouse(
   } catch (cause) {
     if (cause instanceof RunnerError) throw cause;
     throw new RunnerError("Failed to run Lighthouse audit", cause);
-  } finally {
-    chrome.kill();
   }
 }
 

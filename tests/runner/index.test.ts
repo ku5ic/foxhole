@@ -10,6 +10,7 @@ vi.mock("../../src/runner/browser.js", () => ({
   createBrowser: vi.fn(),
   createPage: vi.fn(),
   waitForPageReady: vi.fn(() => Promise.resolve()),
+  extractCdpPort: vi.fn(() => 9222),
 }));
 
 vi.mock("../../src/runner/axe.js", () => ({
@@ -50,6 +51,11 @@ interface FakeBrowser {
   close: ReturnType<typeof vi.fn>;
 }
 
+interface FakeBrowserServer {
+  wsEndpoint: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+}
+
 function makeFakePage(): FakePage {
   return {
     goto: vi.fn(() => Promise.resolve()),
@@ -59,6 +65,13 @@ function makeFakePage(): FakePage {
 
 function makeFakeBrowser(): FakeBrowser {
   return {
+    close: vi.fn(() => Promise.resolve()),
+  };
+}
+
+function makeFakeBrowserServer(): FakeBrowserServer {
+  return {
+    wsEndpoint: vi.fn(() => "ws://127.0.0.1:9222/devtools/browser/test"),
     close: vi.fn(() => Promise.resolve()),
   };
 }
@@ -103,7 +116,10 @@ describe("runAudit - navigation failure", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.mocked(createBrowser)
       .mockRejectedValueOnce(new RunnerError("Failed to launch browser"))
-      .mockResolvedValueOnce(makeFakeBrowser() as never);
+      .mockResolvedValueOnce({
+        browser: makeFakeBrowser() as never,
+        server: makeFakeBrowserServer() as never,
+      });
 
     const results = await runAudit({
       urls: ["https://example.com/a", "https://example.com/b"],
@@ -151,7 +167,10 @@ describe("runAudit - navigation failure", () => {
 
 describe("runAudit - per-category error isolation", () => {
   beforeEach(() => {
-    vi.mocked(createBrowser).mockResolvedValue(makeFakeBrowser() as never);
+    vi.mocked(createBrowser).mockResolvedValue({
+      browser: makeFakeBrowser() as never,
+      server: makeFakeBrowserServer() as never,
+    });
   });
 
   it("produces an errored category for the failed runner and keeps page status ok", async () => {
@@ -228,7 +247,10 @@ describe("runAudit - per-category error isolation", () => {
 
 describe("runAudit - duration_ms", () => {
   beforeEach(() => {
-    vi.mocked(createBrowser).mockResolvedValue(makeFakeBrowser() as never);
+    vi.mocked(createBrowser).mockResolvedValue({
+      browser: makeFakeBrowser() as never,
+      server: makeFakeBrowserServer() as never,
+    });
   });
 
   it("populates duration_ms as a non-negative integer on a successful page", async () => {
@@ -261,7 +283,10 @@ describe("runAudit - duration_ms", () => {
 
 describe("runAudit - perf-noise warning", () => {
   beforeEach(() => {
-    vi.mocked(createBrowser).mockResolvedValue(makeFakeBrowser() as never);
+    vi.mocked(createBrowser).mockResolvedValue({
+      browser: makeFakeBrowser() as never,
+      server: makeFakeBrowserServer() as never,
+    });
   });
 
   it("emits the perf-noise warning when concurrency > 1 and perf is checked", async () => {

@@ -1,13 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Browser, Page } from "playwright";
+import type { Browser, BrowserServer, Page } from "playwright";
 
-import { createBrowser, createPage, waitForPageReady } from "../../src/runner/browser.js";
+import {
+  createBrowser,
+  createPage,
+  waitForPageReady,
+  extractCdpPort,
+} from "../../src/runner/browser.js";
 import { RunnerError } from "../../src/errors.js";
 
-const { mockLaunch } = vi.hoisted(() => ({ mockLaunch: vi.fn() }));
+const { mockLaunchServer, mockConnect } = vi.hoisted(() => ({
+  mockLaunchServer: vi.fn(),
+  mockConnect: vi.fn(),
+}));
 
 vi.mock("playwright", () => ({
-  chromium: { launch: mockLaunch },
+  chromium: { launchServer: mockLaunchServer, connect: mockConnect },
 }));
 
 beforeEach(() => {
@@ -15,15 +23,27 @@ beforeEach(() => {
 });
 
 describe("createBrowser", () => {
-  it("throws RunnerError with the original cause when chromium.launch rejects", async () => {
-    const cause = new Error("playwright launch failed");
-    mockLaunch.mockRejectedValue(cause);
+  it("throws RunnerError with the original cause when chromium.launchServer rejects", async () => {
+    const cause = new Error("server launch failed");
+    mockLaunchServer.mockRejectedValue(cause);
 
     await expect(createBrowser()).rejects.toMatchObject({
       message: "Failed to launch browser",
       cause,
     });
     await expect(createBrowser()).rejects.toBeInstanceOf(RunnerError);
+  });
+
+  it("closes the server when chromium.connect rejects", async () => {
+    const fakeServer = {
+      wsEndpoint: vi.fn(() => "ws://127.0.0.1:9222/devtools/browser/test"),
+      close: vi.fn(() => Promise.resolve()),
+    };
+    mockLaunchServer.mockResolvedValue(fakeServer);
+    mockConnect.mockRejectedValue(new Error("connect failed"));
+
+    await expect(createBrowser()).rejects.toBeInstanceOf(RunnerError);
+    expect(fakeServer.close).toHaveBeenCalledOnce();
   });
 });
 
@@ -55,5 +75,32 @@ describe("waitForPageReady", () => {
       cause,
     });
     await expect(waitForPageReady(page)).rejects.toBeInstanceOf(RunnerError);
+  });
+});
+
+describe("extractCdpPort", () => {
+  it("extracts the port from a valid wsEndpoint", () => {
+    expect(extractCdpPort("ws://127.0.0.1:9222/devtools/browser/abc")).toBe(9222);
+  });
+
+  it("extracts a non-default port correctly", () => {
+    expect(extractCdpPort("ws://127.0.0.1:54321/devtools/browser/xyz")).toBe(54321);
+  });
+
+  it("throws RunnerError when the endpoint is not a valid URL", () => {
+    expect(() => extractCdpPort("not-a-url")).toThrow(RunnerError);
+  });
+
+  it("throws RunnerError when the URL has no port", () => {
+    expect(() => extractCdpPort("ws://127.0.0.1/devtools/browser/abc")).toThrow(RunnerError);
+  });
+
+  it("throws RunnerError when the port is 0", () => {
+    expect(() => extractCdpPort("ws://127.0.0.1:0/devtools/browser/abc")).toThrow(RunnerError);
+  });
+
+  it("error message includes the offending endpoint", () => {
+    const bad = "not-a-url";
+    expect(() => extractCdpPort(bad)).toThrow(bad);
   });
 });
