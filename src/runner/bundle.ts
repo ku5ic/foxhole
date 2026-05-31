@@ -80,10 +80,13 @@ const FRAMEWORK_URL_PATTERNS = [
   "/static/js/runtime-main", // Create React App runtime
   "/node_modules/.vite/", // Vite pre-bundled deps
   "/assets/vendor-", // Vite convention: node_modules split chunk
+  "/@vite/", // Vite dev HMR client (/@vite/client) and env module (/@vite/env)
+  "/@react-refresh", // Vite React plugin Fast Refresh runtime (dev only)
   "/_nuxt/entry.", // Nuxt 3 runtime entry
   "/_nuxt/builds/meta.", // Nuxt 3 build metadata
   "/_app/immutable/entry/", // SvelteKit framework boot
   "/_app/immutable/start-", // SvelteKit Vite runtime shim
+  "/@sveltejs/kit/", // SvelteKit dev server internal runtime modules (dev only)
   "/webpack-runtime-", // Gatsby / generic webpack runtime
   "/build/entry.client-", // Remix client entry
 ] as const;
@@ -106,14 +109,19 @@ const FRAMEWORK_ROOT_PATTERNS: readonly { pattern: string; name: string }[] = [
   { pattern: "/_next/", name: "Next.js" },
   { pattern: "/_nuxt/", name: "Nuxt" },
   { pattern: "/_app/immutable/", name: "SvelteKit" },
+  { pattern: "/_astro/", name: "Astro" },
+  // Vite is listed last: it names the bundler, not the UI framework. Framework-specific roots
+  // above take precedence so that a SvelteKit or Nuxt app (which both use Vite) is named by
+  // its framework, not its bundler.
+  { pattern: "/@vite/", name: "Vite" },
 ];
 
 function detectFramework(urls: string[]): string | null {
-  for (const url of urls) {
-    const path = sanitizeResourceUrl(url);
-    for (const { pattern, name } of FRAMEWORK_ROOT_PATTERNS) {
-      if (path.includes(pattern)) return name;
-    }
+  // Patterns are checked in priority order across all URLs, so pattern specificity
+  // (controlled by the order of FRAMEWORK_ROOT_PATTERNS) wins over URL load order.
+  const paths = urls.map((url) => sanitizeResourceUrl(url));
+  for (const { pattern, name } of FRAMEWORK_ROOT_PATTERNS) {
+    if (paths.some((path) => path.includes(pattern))) return name;
   }
   return null;
 }

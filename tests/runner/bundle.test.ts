@@ -600,6 +600,24 @@ describe("classifyResource", () => {
       classifyResource("https://example.com/_next/static/chunks/framework-abc123.js?v=1"),
     ).toBe("framework");
   });
+
+  it("classifies the Vite dev HMR client as framework", () => {
+    expect(classifyResource("https://example.com/@vite/client")).toBe("framework");
+  });
+
+  it("classifies the Vite env module as framework", () => {
+    expect(classifyResource("https://example.com/@vite/env")).toBe("framework");
+  });
+
+  it("classifies the Vite React Fast Refresh runtime as framework", () => {
+    expect(classifyResource("https://example.com/@react-refresh")).toBe("framework");
+  });
+
+  it("classifies a SvelteKit dev server internal module as framework", () => {
+    expect(classifyResource("https://example.com/@sveltejs/kit/src/runtime/client/app.js")).toBe(
+      "framework",
+    );
+  });
 });
 
 describe("detectFramework", () => {
@@ -638,13 +656,14 @@ describe("detectFramework", () => {
     expect(detectFramework([])).toBeNull();
   });
 
-  it("returns the first matching framework when URLs from multiple frameworks appear", () => {
-    // First-match behavior: Nuxt URL listed before Next.js URL
+  it("returns the framework whose pattern is listed first when multiple frameworks are present", () => {
+    // Pattern order in FRAMEWORK_ROOT_PATTERNS determines the winner, not URL load order.
+    // /_next/ is listed before /_nuxt/, so Next.js wins regardless of which URL appears first.
     const result = detectFramework([
       "https://example.com/_nuxt/entry.abc.js",
       "https://example.com/_next/static/chunks/abc.js",
     ]);
-    expect(result).toBe("Nuxt");
+    expect(result).toBe("Next.js");
   });
 
   it("ignores query strings when matching", () => {
@@ -658,6 +677,24 @@ describe("detectFramework", () => {
         "https://example.com/_next/static/chunks/page.abc.js",
       ]),
     ).toBe("Next.js");
+  });
+
+  it("returns 'Astro' for an Astro resource URL", () => {
+    expect(detectFramework(["https://example.com/_astro/client.abc123.js"])).toBe("Astro");
+  });
+
+  it("returns 'Vite' for a standalone Vite app dev URL", () => {
+    expect(detectFramework(["https://example.com/@vite/client"])).toBe("Vite");
+  });
+
+  it("returns 'SvelteKit' not 'Vite' when SvelteKit URLs coexist with Vite dev URLs", () => {
+    // SvelteKit dev serves both /_app/immutable/ and /@vite/ URLs; the more specific framework
+    // pattern wins because detectFramework checks patterns in priority order, not URL load order.
+    const result = detectFramework([
+      "https://example.com/@vite/client",
+      "https://example.com/_app/immutable/entry/start.abc123.js",
+    ]);
+    expect(result).toBe("SvelteKit");
   });
 });
 
