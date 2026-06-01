@@ -24,12 +24,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Install Chromium
-        run: npx playwright install chromium
-
-      - name: Install Chromium system dependencies
-        run: npx playwright install-deps chromium
-
       - run: npm run clean
       - run: npm run build
 
@@ -38,6 +32,12 @@ jobs:
           npm pack
           VERSION=$(node -e "process.stdout.write(require('./package.json').version)")
           npm install -g "ku5ic-foxhole-${VERSION}.tgz"
+
+      - name: Install Chromium for global foxhole
+        run: $(npm root -g)/@ku5ic/foxhole/node_modules/.bin/playwright install chromium
+
+      - name: Install Chromium system dependencies
+        run: $(npm root -g)/@ku5ic/foxhole/node_modules/.bin/playwright install-deps chromium
 
       - name: Run audit
         # Default threshold is 80. Raise it above ~82 to force exit 1 and demo the gate.
