@@ -411,9 +411,7 @@ This is a local development tool. It is not designed for hostile networks.
 
 `foxhole mcp` is a CLI subcommand. It launches the MCP server on stdio and never exits until stdin closes.
 
-> **Implementation status:** `cli/commands/mcp.ts` does not exist yet. The `foxhole mcp` subcommand has not been registered in `cli/index.ts`. `startMcpServer()` is implemented in `mcp/index.ts` but is not wired to a CLI command. This is Phase 6 work.
-
-The subcommand will be registered in `cli/commands/mcp.ts`. It imports from `mcp/index.ts`, which sets up the `@modelcontextprotocol/sdk` server, registers tool handlers from `mcp/tools/*.ts`, and starts the stdio transport.
+Implemented in `cli/commands/mcp.ts`, registered in `cli/index.ts`. The command calls `startMcpServer()` from `mcp/index.ts`, which sets up the `@modelcontextprotocol/sdk` server, registers tool handlers from `mcp/tools/*.ts`, and starts the stdio transport.
 
 ### 9.2 Tool handlers
 

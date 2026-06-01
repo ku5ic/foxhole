@@ -6,13 +6,13 @@ This document is the canonical roadmap for Foxhole v1.0.0. It describes what eac
 
 ## Current state
 
-Phase 0 and Phase 1 are complete. All tests pass. All four runners produce schema-valid `Finding[]` with stable IDs. The catalog drives titles, severities, and effort estimates. The audit layer scores, prioritizes, and diffs correctly.
+Phases 0-6 are complete. The full v1 feature set ships: all four runners, all five CLI commands including `foxhole mcp`, all six MCP tools, CI workflows, release infrastructure, and a verified exit-code contract. Phase 7 (CI hardening and publish) is in progress.
 
-Open items carried into Phase 2:
+Deferred items carried past v1.0.0:
 
-- `Finding.source` is always null; source map integration is deferred (see Phase 1 Deferred)
-- Lighthouse and Playwright open separate Chromium instances (see Phase 1 Deferred)
-- `--build` mode exists but has not been tested end-to-end with the Phase 1 runners
+- `Finding.source` is always null; source map integration is deferred
+- Lighthouse and Playwright open separate Chromium instances per page; sharing a single Chrome process is deferred
+- `--perf-runs`, `--wait-for`, `--wait-timeout`, `--source-maps` CLI flags are not yet implemented
 
 ---
 
@@ -78,7 +78,7 @@ Open items carried into Phase 2:
 ## Phase 2: Audit layer
 
 **Spec:** `docs/phases/phase-2.md`
-**Status:** Planned
+**Status:** Complete
 
 ### Objectives
 
@@ -103,7 +103,7 @@ Open items carried into Phase 2:
 ## Phase 3: Report rendering
 
 **Spec:** `docs/phases/phase-3.md`
-**Status:** Planned
+**Status:** Complete
 
 ### Objectives
 
@@ -129,7 +129,7 @@ Open items carried into Phase 2:
 ## Phase 4: Multi-URL and --build mode
 
 **Spec:** `docs/phases/phase-4.md`
-**Status:** Planned
+**Status:** Complete
 
 ### Objectives
 
@@ -156,7 +156,7 @@ Open items carried into Phase 2:
 ## Phase 5: Compare and diff
 
 **Spec:** `docs/phases/phase-5.md`
-**Status:** Planned
+**Status:** Complete
 
 ### Objectives
 
@@ -182,7 +182,7 @@ Open items carried into Phase 2:
 ## Phase 6: MCP server
 
 **Spec:** `docs/phases/phase-6.md`
-**Status:** Planned
+**Status:** Complete
 
 ### Objectives
 
@@ -208,7 +208,7 @@ Open items carried into Phase 2:
 ## Phase 7: CI hardening and release prep
 
 **Spec:** `docs/phases/phase-7.md`
-**Status:** Planned
+**Status:** In progress
 
 ### Objectives
 
