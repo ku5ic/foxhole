@@ -14,7 +14,19 @@ Works standalone as a CLI, integrates into CI pipelines, and exposes an MCP serv
 npm install -g foxhole
 ```
 
-Requires Node.js 20 or later. Playwright installs Chromium automatically on first run.
+Then install the Chromium browser foxhole uses to audit pages:
+
+```bash
+npx playwright install chromium
+```
+
+On Linux, also install the system dependencies:
+
+```bash
+npx playwright install-deps chromium
+```
+
+Requires Node.js 20 or later.
 
 ---
 
@@ -232,7 +244,7 @@ foxhole run --build ./dist --urls /login,/dashboard,/settings
 ## Requirements
 
 - Node.js 20 or later
-- Chromium (installed automatically by Playwright on first run)
+- Chromium: run `npx playwright install chromium` after installing foxhole (Linux also needs `npx playwright install-deps chromium`)
 
 ---
 
