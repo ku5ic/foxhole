@@ -15,6 +15,7 @@ import type {
   runMetaSchema,
   severitySchema,
   sourceLocationSchema,
+  throttlingPresetSchema,
 } from "./schema.js";
 
 export type CheckCategory = z.infer<typeof checkCategorySchema>;
@@ -31,5 +32,6 @@ export type PageResult = z.infer<typeof pageResultSchema>;
 export type RunMeta = z.infer<typeof runMetaSchema>;
 export type AuditReport = z.infer<typeof auditReportSchema>;
 export type RunDiff = z.infer<typeof runDiffSchema>;
+export type ThrottlingPreset = z.infer<typeof throttlingPresetSchema>;
 
 export type PageStatus = PageResult["status"];

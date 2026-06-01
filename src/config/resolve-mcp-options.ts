@@ -3,7 +3,7 @@ import { validateChecks, validateThreshold } from "./validate.js";
 import { DEFAULT_CHECKS, DEFAULT_CONCURRENCY, DEFAULT_THROTTLING } from "./defaults.js";
 import { ConfigError } from "../errors.js";
 import type { CheckCategory, InputMode } from "../types/index.js";
-import type { ThrottlingPreset } from "../runner/index.js";
+import type { ThrottlingPreset } from "../types/index.js";
 
 interface McpAuditInput {
   url?: string | undefined;

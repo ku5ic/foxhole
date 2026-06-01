@@ -1,5 +1,5 @@
 import type { CheckCategory } from "../types/index.js";
-import type { ThrottlingPreset } from "../runner/index.js";
+import type { ThrottlingPreset } from "../types/index.js";
 
 const DEFAULT_CHECKS: CheckCategory[] = ["perf", "a11y", "semantic", "bundle"];
 const DEFAULT_OUTPUT = "markdown";

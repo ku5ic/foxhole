@@ -4,10 +4,7 @@ import { z } from "zod";
 import { RunnerError } from "../errors.js";
 import { catalogLookup } from "./catalog-lookup.js";
 import { buildTextFingerprint, computeFindingId } from "./finding-id.js";
-import type { Finding, PerformanceMetrics, Severity } from "../types/index.js";
-
-// Throttling preset names that callers use. The mapping to Lighthouse settings lives here.
-type ThrottlingPreset = "desktop" | "mobile" | "none";
+import type { Finding, PerformanceMetrics, Severity, ThrottlingPreset } from "../types/index.js";
 
 interface LighthouseRunnerResult {
   metrics: PerformanceMetrics;
@@ -290,4 +287,4 @@ export {
   buildAuditCategoryMap,
   buildLighthouseConfig,
 };
-export type { LighthouseRunnerResult, LighthouseAudit, LighthouseCategory, ThrottlingPreset };
+export type { LighthouseRunnerResult, LighthouseAudit, LighthouseCategory };

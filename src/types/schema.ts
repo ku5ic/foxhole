@@ -5,6 +5,7 @@ const effortSchema = z.enum(["low", "medium", "high"]);
 const checkCategorySchema = z.enum(["perf", "a11y", "semantic", "bundle"]);
 const categoryStatusSchema = z.enum(["ok", "errored", "skipped"]);
 const inputModeSchema = z.enum(["url", "urls", "build"]);
+const throttlingPresetSchema = z.enum(["desktop", "mobile", "none"]);
 
 const sourceLocationSchema = z.object({
   file: z.string(),
@@ -152,6 +153,7 @@ export {
   checkCategorySchema,
   categoryStatusSchema,
   inputModeSchema,
+  throttlingPresetSchema,
   sourceLocationSchema,
   findingSchema,
   fixSchema,

@@ -1,12 +1,11 @@
 import { runAudit } from "../runner/index.js";
-import type { ThrottlingPreset } from "../runner/index.js";
 import { scorePage, scoreReport } from "./score.js";
 import type { ScorePageOptions } from "./score.js";
 import { prioritizeFindings } from "./prioritize.js";
 import { summarizeReport } from "./summarize.js";
 import { validateUrl } from "../config/validate.js";
 import { readFoxholeVersion, readDependencyVersion } from "../version.js";
-import type { AuditReport, CheckCategory, InputMode } from "../types/index.js";
+import type { AuditReport, CheckCategory, InputMode, ThrottlingPreset } from "../types/index.js";
 
 interface BuildAuditOptions {
   urls: string[];

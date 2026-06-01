@@ -2,7 +2,7 @@ import { RunnerError, formatErrorChain } from "../errors.js";
 import { createBrowser, createPage, waitForPageReady } from "./browser.js";
 import { runAxe } from "./axe.js";
 import { runLighthouse } from "./lighthouse.js";
-import type { LighthouseRunnerResult, ThrottlingPreset } from "./lighthouse.js";
+import type { LighthouseRunnerResult } from "./lighthouse.js";
 import { runSemanticChecks } from "./semantic.js";
 import { runBundleChecks } from "./bundle.js";
 import type {
@@ -11,6 +11,7 @@ import type {
   Finding,
   PageResult,
   PerformanceMetrics,
+  ThrottlingPreset,
 } from "../types/index.js";
 
 interface RunnerOptions {
@@ -234,4 +235,4 @@ async function runAudit(options: RunnerOptions): Promise<PageResult[]> {
 export { runAudit, runWithConcurrency };
 export type { RunnerOptions };
 
-export { type ThrottlingPreset } from "./lighthouse.js";
+export { type ThrottlingPreset } from "../types/index.js";
