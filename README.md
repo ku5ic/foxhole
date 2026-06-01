@@ -207,11 +207,19 @@ The fixes are ranked by severity. Running with `--output json` produces a struct
 
 Foxhole exposes its audit capabilities as MCP tools callable by any MCP-compatible AI agent.
 
+### Claude Code
+
+Register foxhole as an MCP server:
+
 ```bash
-foxhole mcp
+claude mcp add foxhole foxhole mcp
 ```
 
-Add foxhole to Claude Code:
+That's it. Restart Claude Code and the six tools are available in your session.
+
+### Other MCP clients
+
+Add the following to your MCP client's server config:
 
 ```json
 {
