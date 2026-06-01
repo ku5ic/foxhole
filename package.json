@@ -18,6 +18,24 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ku5ic/foxhole.git"
+  },
+  "homepage": "https://github.com/ku5ic/foxhole#readme",
+  "bugs": {
+    "url": "https://github.com/ku5ic/foxhole/issues"
+  },
+  "keywords": [
+    "accessibility",
+    "lighthouse",
+    "axe-core",
+    "performance",
+    "audit",
+    "ci",
+    "frontend",
+    "mcp"
+  ],
   "author": "Sinisa Kusic",
   "license": "MIT",
   "scripts": {
