@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { MockInstance } from "vitest";
 
+import { ConfigError } from "../../src/errors.js";
 import { handleRun } from "../../src/cli/commands/run.js";
 import { loadConfig } from "../../src/config/load.js";
 import { buildAuditReport } from "../../src/audit/index.js";
@@ -134,17 +135,16 @@ describe("handleRun config-supplied URLs", () => {
     );
   });
 
-  it("exits with code 2 when config has no urls and no CLI flag is provided", async () => {
+  it("throws ConfigError when config has no urls and no CLI flag is provided", async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       checks: ["a11y"],
       output: "markdown",
     });
 
-    await expect(handleRun({ config: "/fake/foxhole.config.json" })).rejects.toThrow(
-      "process.exit called",
-    );
-    expect(stderrSpy).toHaveBeenCalledWith(
-      "Error: /fake/foxhole.config.json does not specify url or urls, and no --url, --urls, or --build flag was given\n",
+    const p = handleRun({ config: "/fake/foxhole.config.json" });
+    await expect(p).rejects.toThrow(ConfigError);
+    await expect(p).rejects.toThrow(
+      "/fake/foxhole.config.json does not specify url or urls, and no --url, --urls, or --build flag was given",
     );
   });
 

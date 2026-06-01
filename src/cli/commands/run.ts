@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 
 import type { Command } from "commander";
 
-import { ConfigError, FoxholeError, formatErrorChain } from "../../errors.js";
+import { ConfigError, FoxholeError, RunnerError, formatErrorChain } from "../../errors.js";
 import { discoverConfig } from "../../config/discover.js";
 import type { DiscoveredConfig } from "../../config/discover.js";
 import type { FoxholeConfig } from "../../config/schema.js";
@@ -28,29 +28,26 @@ function validateInputMode(
 
   if (!hasUrl && !hasUrls && !hasBuild) {
     if (discovered !== undefined) {
-      process.stderr.write(
-        `Error: ${discovered.path} does not specify url or urls, and no --url, --urls, or --build flag was given\n`,
+      throw new ConfigError(
+        `${discovered.path} does not specify url or urls, and no --url, --urls, or --build flag was given`,
       );
     } else {
-      process.stderr.write("Error: one of --url, --urls, or --build is required\n");
-      process.stderr.write("Run 'foxhole run --help' for usage.\n");
+      throw new ConfigError(
+        "one of --url, --urls, or --build is required\nRun 'foxhole run --help' for usage.",
+      );
     }
-    process.exit(2);
   }
 
   if (hasUrl && hasUrls) {
-    process.stderr.write("Error: --url and --urls are mutually exclusive\n");
-    process.exit(2);
+    throw new ConfigError("--url and --urls are mutually exclusive");
   }
 
   if (hasUrl && hasBuild) {
-    process.stderr.write("Error: --url and --build are mutually exclusive\n");
-    process.exit(2);
+    throw new ConfigError("--url and --build are mutually exclusive");
   }
 
   if (hasBuild && !hasUrls) {
-    process.stderr.write("Error: --build requires --urls\n");
-    process.exit(2);
+    throw new ConfigError("--build requires --urls");
   }
 
   if (hasBuild) return "build";
@@ -106,7 +103,8 @@ Config file (foxhole.config.json) is auto-discovered in the current directory wh
     )
     .action(async (options: RunOptions) => {
       try {
-        await handleRun(options);
+        const code = await handleRun(options);
+        process.exit(code);
       } catch (error) {
         if (error instanceof FoxholeError) {
           process.stderr.write(`Error: ${error.message}\n`);
@@ -118,7 +116,7 @@ Config file (foxhole.config.json) is auto-discovered in the current directory wh
     });
 }
 
-async function handleRun(options: RunOptions): Promise<void> {
+async function handleRun(options: RunOptions): Promise<number> {
   const discovered = await discoverConfig(options.config);
   const quiet = options.quiet ?? false;
 
@@ -128,16 +126,7 @@ async function handleRun(options: RunOptions): Promise<void> {
 
   const mode = validateInputMode(options, discovered);
 
-  let resolved;
-  try {
-    resolved = resolveRunOptions(options, discovered?.config);
-  } catch (error) {
-    if (error instanceof ConfigError) {
-      process.stderr.write(`Error: ${error.message}\n`);
-      process.exit(2);
-    }
-    throw error;
-  }
+  const resolved = resolveRunOptions(options, discovered?.config);
 
   const { checks, threshold, outputFormat, throttling, concurrency, out, excludeFramework } =
     resolved;
@@ -178,12 +167,10 @@ async function handleRun(options: RunOptions): Promise<void> {
   }
 
   if (report.pages.length > 0 && report.pages.every((p) => p.status === "errored")) {
-    process.stderr.write("Error: no pages could be audited\n");
-    process.exit(2);
+    throw new RunnerError("no pages could be audited");
   }
-  if (!report.meta.passed) {
-    process.exit(1);
-  }
+
+  return report.meta.passed ? 0 : 1;
 }
 
 export { registerRunCommand, handleRun };

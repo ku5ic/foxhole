@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { MockInstance } from "vitest";
 
+import { ConfigError } from "../../src/errors.js";
 import { handleRun } from "../../src/cli/commands/run.js";
 import { serveStaticBuild } from "../../src/server/static.js";
 import { buildAuditReport } from "../../src/audit/index.js";
@@ -49,19 +49,11 @@ function makeReport(passed = true): AuditReport {
   };
 }
 
-class ProcessExit extends Error {
-  constructor(public readonly code: number) {
-    super(`__exit:${String(code)}__`);
-  }
-}
-
-let stderrSpy: MockInstance;
-
 beforeEach(() => {
   vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-  stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-  vi.spyOn(process, "exit").mockImplementation((code) => {
-    throw new ProcessExit(typeof code === "number" ? code : 0);
+  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  vi.spyOn(process, "exit").mockImplementation(() => {
+    throw new Error("process.exit must not be called from handleRun");
   });
 });
 
@@ -71,29 +63,26 @@ afterEach(() => {
 });
 
 describe("handleRun input validation", () => {
-  it("exits with code 2 when no input flag is provided", async () => {
-    await expect(handleRun({})).rejects.toMatchObject({ code: 2 });
-    expect(stderrSpy).toHaveBeenCalledWith("Error: one of --url, --urls, or --build is required\n");
-    expect(stderrSpy).toHaveBeenCalledWith("Run 'foxhole run --help' for usage.\n");
+  it("throws ConfigError when no input flag is provided", async () => {
+    const p = handleRun({});
+    await expect(p).rejects.toThrow(ConfigError);
+    await expect(p).rejects.toThrow("one of --url, --urls, or --build is required");
   });
 
-  it("exits with code 2 when --url and --urls are both set", async () => {
-    await expect(handleRun({ url: "https://a.com", urls: "https://b.com" })).rejects.toMatchObject({
-      code: 2,
-    });
-    expect(stderrSpy).toHaveBeenCalledWith("Error: --url and --urls are mutually exclusive\n");
+  it("throws ConfigError when --url and --urls are both set", async () => {
+    await expect(handleRun({ url: "https://a.com", urls: "https://b.com" })).rejects.toThrow(
+      "--url and --urls are mutually exclusive",
+    );
   });
 
-  it("exits with code 2 when --build and --url are both set", async () => {
-    await expect(handleRun({ build: "./dist", url: "https://a.com" })).rejects.toMatchObject({
-      code: 2,
-    });
-    expect(stderrSpy).toHaveBeenCalledWith("Error: --url and --build are mutually exclusive\n");
+  it("throws ConfigError when --build and --url are both set", async () => {
+    await expect(handleRun({ build: "./dist", url: "https://a.com" })).rejects.toThrow(
+      "--url and --build are mutually exclusive",
+    );
   });
 
-  it("exits with code 2 when --build is set without --urls", async () => {
-    await expect(handleRun({ build: "./dist" })).rejects.toMatchObject({ code: 2 });
-    expect(stderrSpy).toHaveBeenCalledWith("Error: --build requires --urls\n");
+  it("throws ConfigError when --build is set without --urls", async () => {
+    await expect(handleRun({ build: "./dist" })).rejects.toThrow("--build requires --urls");
   });
 });
 
@@ -198,35 +187,30 @@ describe("handleRun --throttling", () => {
     expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ throttling: "none" }));
   });
 
-  it("exits with code 2 for an invalid throttling preset", async () => {
-    await expect(
-      handleRun({ url: "https://example.com", throttling: "turbo" }),
-    ).rejects.toMatchObject({ code: 2 });
-    expect(stderrSpy).toHaveBeenCalledWith(
-      'Error: --throttling must be one of: desktop, mobile, none (got "turbo")\n',
-    );
+  it("throws ConfigError for an invalid throttling preset", async () => {
+    const p = handleRun({ url: "https://example.com", throttling: "turbo" });
+    await expect(p).rejects.toThrow(ConfigError);
+    await expect(p).rejects.toThrow("must be one of: desktop, mobile, none");
   });
 });
 
 describe("handleRun resolver validation", () => {
-  it("exits with code 2 for an invalid --checks value", async () => {
-    await expect(
-      handleRun({ url: "https://example.com", checks: "a11y,notacheck" }),
-    ).rejects.toMatchObject({ code: 2 });
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("notacheck"));
+  it("throws ConfigError for an invalid --checks value", async () => {
+    const p = handleRun({ url: "https://example.com", checks: "a11y,notacheck" });
+    await expect(p).rejects.toThrow(ConfigError);
+    await expect(p).rejects.toThrow("notacheck");
   });
 
-  it("exits with code 2 for a NaN --threshold", async () => {
-    await expect(
-      handleRun({ url: "https://example.com", threshold: Number.NaN }),
-    ).rejects.toMatchObject({ code: 2 });
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("threshold"));
+  it("throws ConfigError for a NaN --threshold", async () => {
+    const p = handleRun({ url: "https://example.com", threshold: Number.NaN });
+    await expect(p).rejects.toThrow(ConfigError);
+    await expect(p).rejects.toThrow("threshold");
   });
 
-  it("exits with code 2 for an out-of-range --threshold", async () => {
-    await expect(handleRun({ url: "https://example.com", threshold: 150 })).rejects.toMatchObject({
-      code: 2,
-    });
+  it("throws ConfigError for an out-of-range --threshold", async () => {
+    await expect(handleRun({ url: "https://example.com", threshold: 150 })).rejects.toThrow(
+      ConfigError,
+    );
   });
 
   it("passes checks from --checks flag to buildAuditReport", async () => {
@@ -237,5 +221,19 @@ describe("handleRun resolver validation", () => {
     expect(buildAuditReport).toHaveBeenCalledWith(
       expect.objectContaining({ checks: ["a11y", "perf"] }),
     );
+  });
+});
+
+describe("handleRun exit code", () => {
+  it("resolves to 0 when the audit passes", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport(true));
+
+    await expect(handleRun({ url: "https://example.com" })).resolves.toBe(0);
+  });
+
+  it("resolves to 1 when the audit is below threshold", async () => {
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport(false));
+
+    await expect(handleRun({ url: "https://example.com" })).resolves.toBe(1);
   });
 });
