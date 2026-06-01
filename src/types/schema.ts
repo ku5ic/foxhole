@@ -103,6 +103,10 @@ const runMetaSchema = z
     perf_profile: z.enum(["desktop", "mobile", "none"]),
     source_maps: z.enum(["auto", "on", "off"]),
     exclude_framework: z.boolean().optional().default(false),
+    run_id: z.string().nullable().optional(),
+    project_id: z.string().nullable().optional(),
+    commit_sha: z.string().nullable().optional(),
+    branch: z.string().nullable().optional(),
     dependencies: dependenciesSchema,
   })
   .strict();

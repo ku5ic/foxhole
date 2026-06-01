@@ -40,6 +40,11 @@ const validMeta = {
   perf_runs: 1,
   perf_profile: "none" as const,
   source_maps: "auto" as const,
+  exclude_framework: false,
+  run_id: null,
+  project_id: null,
+  commit_sha: null,
+  branch: null,
   dependencies: { axe_core: "4.10.0", lighthouse: "12.2.1", playwright: "1.48.0" },
 };
 

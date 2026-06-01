@@ -78,6 +78,12 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
       perf_profile: options.throttling,
       source_maps: options.sourceMaps,
       exclude_framework: excludeFramework,
+      run_id: null,
+      // project_id: stable hash of the normalized target identity (host + pathname,
+      // scheme and trailing slash normalized away). Reserved for the hosted tier.
+      project_id: null,
+      commit_sha: null,
+      branch: null,
       dependencies: {
         axe_core: readDependencyVersion("axe-core"),
         lighthouse: readDependencyVersion("lighthouse"),
