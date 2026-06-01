@@ -7,7 +7,8 @@ import { z } from "zod";
 
 import { RunnerError } from "../errors.js";
 import { catalogLookup } from "./catalog-lookup.js";
-import { buildSemanticPath, buildTextFingerprint, computeFindingId } from "./finding-id.js";
+import { buildSemanticPath, buildTextFingerprint } from "./finding-id.js";
+import { makeFinding } from "./make-finding.js";
 import { sanitizeSelector } from "./sanitize.js";
 import type { Finding, Severity } from "../types/index.js";
 
@@ -99,25 +100,20 @@ function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Fi
     : `Review this issue using axe-core documentation: ${violation.helpUrl}`;
 
   if (violation.nodes.length === 0) {
-    const textFingerprint = buildTextFingerprint({ ruleId: violation.id, detail: "" });
-    const id = computeFindingId({ pageUrl, ruleId, semanticPath: "", textFingerprint });
     return [
-      {
-        id,
+      makeFinding({
         category: "a11y",
+        ruleId,
+        pageUrl,
         severity,
         effort,
-        rule_id: ruleId,
         title,
         description,
         recommendation,
-        selector: null,
+        textFingerprint: buildTextFingerprint({ ruleId: violation.id, detail: "" }),
         wcag,
         impact: violation.impact ?? null,
-        source: null,
-        kind: null,
-        url: pageUrl,
-      },
+      }),
     ];
   }
 
@@ -129,23 +125,21 @@ function mapAxeViolationToFindings(violation: AxeViolation, pageUrl: string): Fi
       ruleId: violation.id,
       detail: selectorRaw ?? "",
     });
-    const id = computeFindingId({ pageUrl, ruleId, semanticPath, textFingerprint });
-    return {
-      id,
-      category: "a11y" as const,
+    return makeFinding({
+      category: "a11y",
+      ruleId,
+      pageUrl,
       severity,
       effort,
-      rule_id: ruleId,
       title,
       description,
       recommendation,
+      textFingerprint,
+      semanticPath,
       selector,
       wcag,
       impact: violation.impact ?? null,
-      source: null,
-      kind: null,
-      url: pageUrl,
-    };
+    });
   });
 }
 

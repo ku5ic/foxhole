@@ -1,10 +1,10 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 
 import type { Command } from "commander";
 
-import { ConfigError, FoxholeError, formatErrorChain } from "../../errors.js";
-import { loadConfig } from "../../config/load.js";
+import { ConfigError, FoxholeError, RunnerError, formatErrorChain } from "../../errors.js";
+import { discoverConfig } from "../../config/discover.js";
+import type { DiscoveredConfig } from "../../config/discover.js";
 import type { FoxholeConfig } from "../../config/schema.js";
 import { resolveRunOptions } from "../../config/resolve-options.js";
 import { buildAuditReport } from "../../audit/index.js";
@@ -16,30 +16,38 @@ import type { AuditReport } from "../../types/index.js";
 
 type InputMode = "url" | "urls" | "build";
 
-function validateInputMode(options: RunOptions, config: FoxholeConfig | undefined): InputMode {
+function validateInputMode(
+  options: RunOptions,
+  discovered: DiscoveredConfig | undefined,
+): InputMode {
+  const config = discovered?.config;
   const hasUrl = options.url !== undefined || config?.url !== undefined;
   const hasUrls =
     options.urls !== undefined || (config?.urls !== undefined && config.urls.length > 0);
   const hasBuild = options.build !== undefined;
 
   if (!hasUrl && !hasUrls && !hasBuild) {
-    process.stderr.write("Error: one of --url, --urls, or --build is required\n");
-    process.exit(2);
+    if (discovered !== undefined) {
+      throw new ConfigError(
+        `${discovered.path} does not specify url or urls, and no --url, --urls, or --build flag was given`,
+      );
+    } else {
+      throw new ConfigError(
+        "one of --url, --urls, or --build is required\nRun 'foxhole run --help' for usage.",
+      );
+    }
   }
 
   if (hasUrl && hasUrls) {
-    process.stderr.write("Error: --url and --urls are mutually exclusive\n");
-    process.exit(2);
+    throw new ConfigError("--url and --urls are mutually exclusive");
   }
 
   if (hasUrl && hasBuild) {
-    process.stderr.write("Error: --url and --build are mutually exclusive\n");
-    process.exit(2);
+    throw new ConfigError("--url and --build are mutually exclusive");
   }
 
   if (hasBuild && !hasUrls) {
-    process.stderr.write("Error: --build requires --urls\n");
-    process.exit(2);
+    throw new ConfigError("--build requires --urls");
   }
 
   if (hasBuild) return "build";
@@ -95,7 +103,8 @@ Config file (foxhole.config.json) is auto-discovered in the current directory wh
     )
     .action(async (options: RunOptions) => {
       try {
-        await handleRun(options);
+        const code = await handleRun(options);
+        process.exit(code);
       } catch (error) {
         if (error instanceof FoxholeError) {
           process.stderr.write(`Error: ${error.message}\n`);
@@ -107,39 +116,20 @@ Config file (foxhole.config.json) is auto-discovered in the current directory wh
     });
 }
 
-// When --config is absent, look for foxhole.config.json in the current working directory.
-// Explicit --config paths always load or throw; auto-discovered config is silently skipped if absent.
-async function loadConfigForRun(
-  configPath: string | undefined,
-): Promise<FoxholeConfig | undefined> {
-  if (configPath) return loadConfig(configPath);
-  const cwdConfig = path.join(process.cwd(), "foxhole.config.json");
-  try {
-    await fs.access(cwdConfig);
-    return loadConfig(cwdConfig);
-  } catch {
-    return undefined;
-  }
-}
+async function handleRun(options: RunOptions): Promise<number> {
+  const discovered = await discoverConfig(options.config);
+  const quiet = options.quiet ?? false;
 
-async function handleRun(options: RunOptions): Promise<void> {
-  const config = await loadConfigForRun(options.config);
-  const mode = validateInputMode(options, config);
-
-  let resolved;
-  try {
-    resolved = resolveRunOptions(options, config);
-  } catch (error) {
-    if (error instanceof ConfigError) {
-      process.stderr.write(`Error: ${error.message}\n`);
-      process.exit(2);
-    }
-    throw error;
+  if (discovered !== undefined && !quiet) {
+    process.stderr.write(`Using config: ${discovered.path}\n`);
   }
+
+  const mode = validateInputMode(options, discovered);
+
+  const resolved = resolveRunOptions(options, discovered?.config);
 
   const { checks, threshold, outputFormat, throttling, concurrency, out, excludeFramework } =
     resolved;
-  const quiet = options.quiet ?? false;
 
   let server: StaticServer | null = null;
   let report: AuditReport;
@@ -149,7 +139,7 @@ async function handleRun(options: RunOptions): Promise<void> {
       server = await serveStaticBuild(options.build);
       serverUrl = server.url;
     }
-    const urls = resolveUrls(options, serverUrl, config);
+    const urls = resolveUrls(options, serverUrl, discovered?.config);
 
     report = await buildAuditReport({
       urls,
@@ -177,12 +167,10 @@ async function handleRun(options: RunOptions): Promise<void> {
   }
 
   if (report.pages.length > 0 && report.pages.every((p) => p.status === "errored")) {
-    process.stderr.write("Error: no pages could be audited\n");
-    process.exit(2);
+    throw new RunnerError("no pages could be audited");
   }
-  if (!report.meta.passed) {
-    process.exit(1);
-  }
+
+  return report.meta.passed ? 0 : 1;
 }
 
 export { registerRunCommand, handleRun };

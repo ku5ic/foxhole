@@ -2,7 +2,8 @@ import type { Page, Response as PlaywrightResponse } from "playwright";
 
 import { RunnerError } from "../errors.js";
 import { catalogLookup } from "./catalog-lookup.js";
-import { buildTextFingerprint, computeFindingId } from "./finding-id.js";
+import { buildTextFingerprint } from "./finding-id.js";
+import { makeFinding } from "./make-finding.js";
 import type { Finding } from "../types/index.js";
 
 interface BundleRunnerResult {
@@ -199,31 +200,23 @@ function buildBundleFindings(
     } else {
       totalJsDescription = `Total JavaScript transferred is ${detail}, which exceeds the 500 KB threshold. Detected a ${detectedFramework} app; a framework and application breakdown is not available for this build's chunk naming.`;
     }
-    findings.push({
-      id: computeFindingId({
-        pageUrl,
+    findings.push(
+      makeFinding({
+        category: "bundle",
         ruleId,
-        semanticPath: "",
+        pageUrl,
+        severity: entry?.default_severity ?? "major",
+        effort: entry?.default_effort ?? "high",
+        title: entry?.title_template ?? "Total JavaScript transfer size exceeds 500 KB",
+        description: totalJsDescription,
+        recommendation:
+          entry?.recommendation ??
+          "Split bundles, remove unused code, and lazy-load non-critical JavaScript.",
         // Empty detail: ruleId + pageUrl already uniquely identify this single-instance finding.
         // Passing the measured KB would make the ID change across runs.
         textFingerprint: buildTextFingerprint({ ruleId, detail: "" }),
       }),
-      category: "bundle",
-      severity: entry?.default_severity ?? "major",
-      effort: entry?.default_effort ?? "high",
-      rule_id: ruleId,
-      title: entry?.title_template ?? "Total JavaScript transfer size exceeds 500 KB",
-      description: totalJsDescription,
-      recommendation:
-        entry?.recommendation ??
-        "Split bundles, remove unused code, and lazy-load non-critical JavaScript.",
-      selector: null,
-      wcag: null,
-      impact: null,
-      source: null,
-      kind: null,
-      url: pageUrl,
-    });
+    );
   }
 
   for (const resource of jsResources) {
@@ -238,27 +231,21 @@ function buildBundleFindings(
           ? FRAMEWORK_CHUNK_RECOMMENDATION
           : (entry?.recommendation ??
             "Split this bundle into smaller chunks or lazy-load non-critical parts.");
-      findings.push({
-        id: computeFindingId({
-          pageUrl,
+      findings.push(
+        makeFinding({
+          category: "bundle",
           ruleId,
+          pageUrl,
+          severity: entry?.default_severity ?? "minor",
+          effort: entry?.default_effort ?? "medium",
+          title: entry?.title_template ?? "Single JavaScript resource exceeds 200 KB",
+          description: `${sanitized} is ${formatKb(resource.size)}.`,
+          recommendation,
           semanticPath: sanitized,
           textFingerprint: buildTextFingerprint({ ruleId, detail }),
+          kind,
         }),
-        category: "bundle",
-        severity: entry?.default_severity ?? "minor",
-        effort: entry?.default_effort ?? "medium",
-        rule_id: ruleId,
-        title: entry?.title_template ?? "Single JavaScript resource exceeds 200 KB",
-        description: `${sanitized} is ${formatKb(resource.size)}.`,
-        recommendation,
-        selector: null,
-        wcag: null,
-        impact: null,
-        source: null,
-        kind,
-        url: pageUrl,
-      });
+      );
     }
   }
 
@@ -266,57 +253,42 @@ function buildBundleFindings(
     const ruleId = "bundle/total-css-size";
     const entry = catalogLookup(ruleId);
     const detail = formatKb(totalCss);
-    findings.push({
-      id: computeFindingId({
-        pageUrl,
+    findings.push(
+      makeFinding({
+        category: "bundle",
         ruleId,
-        semanticPath: "",
+        pageUrl,
+        severity: entry?.default_severity ?? "minor",
+        effort: entry?.default_effort ?? "medium",
+        title: entry?.title_template ?? "Total CSS transfer size exceeds 100 KB",
+        description: `Total CSS transferred is ${detail}, which exceeds the 100 KB threshold.`,
+        recommendation:
+          entry?.recommendation ??
+          "Remove unused CSS, split critical from non-critical styles, and load non-critical CSS asynchronously.",
         // Empty detail: ruleId + pageUrl already uniquely identify this single-instance finding.
         textFingerprint: buildTextFingerprint({ ruleId, detail: "" }),
       }),
-      category: "bundle",
-      severity: entry?.default_severity ?? "minor",
-      effort: entry?.default_effort ?? "medium",
-      rule_id: ruleId,
-      title: entry?.title_template ?? "Total CSS transfer size exceeds 100 KB",
-      description: `Total CSS transferred is ${detail}, which exceeds the 100 KB threshold.`,
-      recommendation:
-        entry?.recommendation ??
-        "Remove unused CSS, split critical from non-critical styles, and load non-critical CSS asynchronously.",
-      selector: null,
-      wcag: null,
-      impact: null,
-      source: null,
-      kind: null,
-      url: pageUrl,
-    });
+    );
   }
 
   for (const resourceUrl of httpResources) {
     const ruleId = "bundle/insecure-resource";
     const entry = catalogLookup(ruleId);
     const sanitized = sanitizeResourceUrl(resourceUrl);
-    findings.push({
-      id: computeFindingId({
-        pageUrl,
+    findings.push(
+      makeFinding({
+        category: "bundle",
         ruleId,
+        pageUrl,
+        severity: entry?.default_severity ?? "critical",
+        effort: entry?.default_effort ?? "low",
+        title: entry?.title_template ?? "Resource loaded over insecure HTTP",
+        description: `${sanitized} is loaded over HTTP instead of HTTPS.`,
+        recommendation: entry?.recommendation ?? "Update the resource URL to use HTTPS.",
         semanticPath: sanitized,
         textFingerprint: buildTextFingerprint({ ruleId, detail: resourceUrl }),
       }),
-      category: "bundle",
-      severity: entry?.default_severity ?? "critical",
-      effort: entry?.default_effort ?? "low",
-      rule_id: ruleId,
-      title: entry?.title_template ?? "Resource loaded over insecure HTTP",
-      description: `${sanitized} is loaded over HTTP instead of HTTPS.`,
-      recommendation: entry?.recommendation ?? "Update the resource URL to use HTTPS.",
-      selector: null,
-      wcag: null,
-      impact: null,
-      source: null,
-      kind: null,
-      url: pageUrl,
-    });
+    );
   }
 
   return findings;

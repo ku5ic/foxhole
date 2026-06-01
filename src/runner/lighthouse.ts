@@ -3,11 +3,9 @@ import { z } from "zod";
 
 import { RunnerError } from "../errors.js";
 import { catalogLookup } from "./catalog-lookup.js";
-import { buildTextFingerprint, computeFindingId } from "./finding-id.js";
-import type { Finding, PerformanceMetrics, Severity } from "../types/index.js";
-
-// Throttling preset names that callers use. The mapping to Lighthouse settings lives here.
-type ThrottlingPreset = "desktop" | "mobile" | "none";
+import { buildTextFingerprint } from "./finding-id.js";
+import { makeFinding } from "./make-finding.js";
+import type { Finding, PerformanceMetrics, Severity, ThrottlingPreset } from "../types/index.js";
 
 interface LighthouseRunnerResult {
   metrics: PerformanceMetrics;
@@ -222,24 +220,17 @@ function mapLighthouseAuditToFinding(audit: LighthouseAudit, pageUrl: string): F
     ruleId: audit.id,
     detail: fingerprintDetail,
   });
-  const id = computeFindingId({ pageUrl, ruleId, semanticPath: "", textFingerprint });
-
-  return {
-    id,
+  return makeFinding({
     category: "perf",
+    ruleId,
+    pageUrl,
     severity,
     effort,
-    rule_id: ruleId,
     title,
     description,
     recommendation,
-    selector: null,
-    wcag: null,
-    impact: null,
-    source: null,
-    kind: null,
-    url: pageUrl,
-  };
+    textFingerprint,
+  });
 }
 
 async function runLighthouse(
@@ -290,4 +281,4 @@ export {
   buildAuditCategoryMap,
   buildLighthouseConfig,
 };
-export type { LighthouseRunnerResult, LighthouseAudit, LighthouseCategory, ThrottlingPreset };
+export type { LighthouseRunnerResult, LighthouseAudit, LighthouseCategory };

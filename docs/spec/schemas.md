@@ -182,6 +182,10 @@ export interface RunMeta {
   perf_profile: "desktop" | "mobile" | "none";
   source_maps: "auto" | "on" | "off";
   exclude_framework?: boolean; // optional, defaults to false; true when --exclude-framework was active
+  run_id?: string | null; // optional; populated by the hosted layer, null or absent in the free CLI
+  project_id?: string | null; // optional; hosted-layer project identifier
+  commit_sha?: string | null; // optional; VCS commit associated with this run
+  branch?: string | null; // optional; VCS branch associated with this run
   dependencies: {
     axe_core: string; // version of axe-core used
     lighthouse: string; // version of lighthouse used

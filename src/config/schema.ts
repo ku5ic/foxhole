@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { throttlingPresetSchema } from "../types/schema.js";
+
 const foxholeConfigSchema = z
   .object({
     url: z.url().optional(),
@@ -9,7 +11,7 @@ const foxholeConfigSchema = z
       .optional()
       .default(["perf", "a11y", "semantic", "bundle"]),
     output: z.enum(["json", "markdown"]).optional().default("markdown"),
-    throttling: z.enum(["desktop", "mobile", "none"]).optional(),
+    throttling: throttlingPresetSchema.optional(),
     concurrency: z.number().int().min(1).optional(),
     out: z.string().optional(),
     threshold: z.number().min(0).max(100).optional(),

@@ -8,7 +8,7 @@ import { validateChecks, validateConcurrency, validateThreshold } from "./valida
 import { ConfigError } from "../errors.js";
 import type { FoxholeConfig } from "./schema.js";
 import type { CheckCategory } from "../types/index.js";
-import type { ThrottlingPreset } from "../runner/index.js";
+import type { ThrottlingPreset } from "../types/index.js";
 
 interface ResolvedRunOptions {
   checks: CheckCategory[];
