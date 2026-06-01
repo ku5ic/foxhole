@@ -43,7 +43,17 @@ async function buildAuditReport(options: BuildAuditOptions): Promise<AuditReport
   const prioritizedFixes = prioritizeFindings(allFindings);
 
   const durationMs = Date.now() - startTime;
-  const passed = options.threshold === undefined ? true : overallScore >= options.threshold;
+  // An all-errored run must never be passed regardless of threshold -- nothing was audited.
+  const allPagesErrored =
+    scoredPages.length > 0 && scoredPages.every((p) => p.status === "errored");
+  let passed: boolean;
+  if (allPagesErrored) {
+    passed = false;
+  } else if (options.threshold === undefined) {
+    passed = true;
+  } else {
+    passed = overallScore >= options.threshold;
+  }
   const summary = summarizeReport(scoredPages, overallScore, passed, excludeFramework);
 
   return {
