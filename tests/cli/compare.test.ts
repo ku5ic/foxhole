@@ -116,3 +116,15 @@ describe("handleCompare: read failure propagates", () => {
     await expect(handleCompare("missing.json", "b.json", {})).rejects.toThrow("file not found");
   });
 });
+
+describe("handleCompare: diff failure propagates", () => {
+  it("rejects when diffReports throws", async () => {
+    vi.mocked(diffReports).mockImplementation(() => {
+      throw new Error("incompatible report versions");
+    });
+
+    await expect(handleCompare("a.json", "b.json", {})).rejects.toThrow(
+      "incompatible report versions",
+    );
+  });
+});
