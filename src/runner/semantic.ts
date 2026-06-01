@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import { RunnerError } from "../errors.js";
 import { catalogLookup } from "./catalog-lookup.js";
-import { buildSemanticPath, buildTextFingerprint, computeFindingId } from "./finding-id.js";
+import { buildSemanticPath, buildTextFingerprint } from "./finding-id.js";
+import { makeFinding } from "./make-finding.js";
 import { sanitizeSelector } from "./sanitize.js";
 import type { Finding } from "../types/index.js";
 
@@ -123,24 +124,19 @@ function mapSemanticResultToFindings(result: SemanticCheckResult, pageUrl: strin
   return result.issues.map((issue) => {
     const semanticPath = issue.outerHTML === null ? "" : buildSemanticPath(issue.outerHTML);
     const textFingerprint = buildTextFingerprint({ ruleId: result.check, detail: issue.detail });
-    const id = computeFindingId({ pageUrl, ruleId, semanticPath, textFingerprint });
-
-    return {
-      id,
-      category: "semantic" as const,
-      severity: entry ? entry.default_severity : ("minor" as const),
-      effort: entry ? entry.default_effort : ("low" as const),
-      rule_id: ruleId,
+    return makeFinding({
+      category: "semantic",
+      ruleId,
+      pageUrl,
+      severity: entry ? entry.default_severity : "minor",
+      effort: entry ? entry.default_effort : "low",
       title: entry ? entry.title_template : result.check,
       description: issue.detail,
       recommendation: entry ? entry.recommendation : "Review and fix the semantic issue.",
+      textFingerprint,
+      semanticPath,
       selector: issue.selector === null ? null : sanitizeSelector(issue.selector),
-      wcag: null,
-      impact: null,
-      source: null,
-      kind: null,
-      url: pageUrl,
-    };
+    });
   });
 }
 
