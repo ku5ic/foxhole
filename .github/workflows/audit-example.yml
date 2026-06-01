@@ -37,7 +37,7 @@ jobs:
         run: |
           npm pack
           VERSION=$(node -e "process.stdout.write(require('./package.json').version)")
-          npm install -g "foxhole-${VERSION}.tgz"
+          npm install -g "ku5ic-foxhole-${VERSION}.tgz"
 
       - name: Run audit
         # Default threshold is 80. Raise it above ~82 to force exit 1 and demo the gate.

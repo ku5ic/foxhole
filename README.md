@@ -1,7 +1,7 @@
 # foxhole
 
 [![CI](https://github.com/ku5ic/foxhole/actions/workflows/ci.yml/badge.svg)](https://github.com/ku5ic/foxhole/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/foxhole.svg)](https://www.npmjs.com/package/foxhole)
+[![npm](https://img.shields.io/npm/v/%40ku5ic%2Ffoxhole.svg)](https://www.npmjs.com/package/@ku5ic/foxhole)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Frontend audit CLI and MCP server. Dig into your frontend. Find what is hiding.
@@ -17,7 +17,7 @@ The primary use case is a CI gate. Foxhole exits non-zero when the audit score d
 ```yaml
 - name: Install foxhole
   run: |
-    npm install -g foxhole
+    npm install -g @ku5ic/foxhole
     npx playwright install chromium
     npx playwright install-deps chromium   # Linux only
 
@@ -45,7 +45,7 @@ A non-zero exit makes the step fail. The JSON report is the artifact you upload 
 ## Install
 
 ```bash
-npm install -g foxhole
+npm install -g @ku5ic/foxhole
 ```
 
 Then install the Chromium browser foxhole uses to audit pages:

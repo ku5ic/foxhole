@@ -22,11 +22,11 @@ npm publish --access public --dry-run   # verify the tarball looks right
 npm publish --access public             # first publish, creates the package on npmjs.com
 ```
 
-The package name `foxhole` must not be claimed by another owner. Check with `npm view foxhole` before running.
+The package is published as `@ku5ic/foxhole`. Verify it is not yet published: `npm view @ku5ic/foxhole`.
 
 **Step 2 - Configure trusted publishing on npmjs.com:**
 
-1. Go to https://www.npmjs.com/package/foxhole -> Settings -> Publishing access.
+1. Go to https://www.npmjs.com/package/@ku5ic/foxhole -> Settings -> Publishing access.
 2. Under "Trusted publishers", add a new publisher:
    - Provider: GitHub Actions
    - Owner: `ku5ic`
@@ -72,7 +72,7 @@ npm publish --dry-run
 `npm pack` produces a `.tgz` file. Inspect it with:
 
 ```bash
-tar -tf foxhole-*.tgz
+tar -tf ku5ic-foxhole-*.tgz
 ```
 
 The tarball must contain only `dist/`, `bin/`, `README.md`, `LICENSE`, `CHANGELOG.md`, and `package.json`. Delete the `.tgz` after inspection.
