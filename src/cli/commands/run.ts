@@ -1,10 +1,10 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 
 import type { Command } from "commander";
 
 import { ConfigError, FoxholeError, formatErrorChain } from "../../errors.js";
-import { loadConfig } from "../../config/load.js";
+import { discoverConfig } from "../../config/discover.js";
+import type { DiscoveredConfig } from "../../config/discover.js";
 import type { FoxholeConfig } from "../../config/schema.js";
 import { resolveRunOptions } from "../../config/resolve-options.js";
 import { buildAuditReport } from "../../audit/index.js";
@@ -16,14 +16,25 @@ import type { AuditReport } from "../../types/index.js";
 
 type InputMode = "url" | "urls" | "build";
 
-function validateInputMode(options: RunOptions, config: FoxholeConfig | undefined): InputMode {
+function validateInputMode(
+  options: RunOptions,
+  discovered: DiscoveredConfig | undefined,
+): InputMode {
+  const config = discovered?.config;
   const hasUrl = options.url !== undefined || config?.url !== undefined;
   const hasUrls =
     options.urls !== undefined || (config?.urls !== undefined && config.urls.length > 0);
   const hasBuild = options.build !== undefined;
 
   if (!hasUrl && !hasUrls && !hasBuild) {
-    process.stderr.write("Error: one of --url, --urls, or --build is required\n");
+    if (discovered !== undefined) {
+      process.stderr.write(
+        `Error: ${discovered.path} does not specify url or urls, and no --url, --urls, or --build flag was given\n`,
+      );
+    } else {
+      process.stderr.write("Error: one of --url, --urls, or --build is required\n");
+      process.stderr.write("Run 'foxhole run --help' for usage.\n");
+    }
     process.exit(2);
   }
 
@@ -107,28 +118,19 @@ Config file (foxhole.config.json) is auto-discovered in the current directory wh
     });
 }
 
-// When --config is absent, look for foxhole.config.json in the current working directory.
-// Explicit --config paths always load or throw; auto-discovered config is silently skipped if absent.
-async function loadConfigForRun(
-  configPath: string | undefined,
-): Promise<FoxholeConfig | undefined> {
-  if (configPath) return loadConfig(configPath);
-  const cwdConfig = path.join(process.cwd(), "foxhole.config.json");
-  try {
-    await fs.access(cwdConfig);
-    return loadConfig(cwdConfig);
-  } catch {
-    return undefined;
-  }
-}
-
 async function handleRun(options: RunOptions): Promise<void> {
-  const config = await loadConfigForRun(options.config);
-  const mode = validateInputMode(options, config);
+  const discovered = await discoverConfig(options.config);
+  const quiet = options.quiet ?? false;
+
+  if (discovered !== undefined && !quiet) {
+    process.stderr.write(`Using config: ${discovered.path}\n`);
+  }
+
+  const mode = validateInputMode(options, discovered);
 
   let resolved;
   try {
-    resolved = resolveRunOptions(options, config);
+    resolved = resolveRunOptions(options, discovered?.config);
   } catch (error) {
     if (error instanceof ConfigError) {
       process.stderr.write(`Error: ${error.message}\n`);
@@ -139,7 +141,6 @@ async function handleRun(options: RunOptions): Promise<void> {
 
   const { checks, threshold, outputFormat, throttling, concurrency, out, excludeFramework } =
     resolved;
-  const quiet = options.quiet ?? false;
 
   let server: StaticServer | null = null;
   let report: AuditReport;
@@ -149,7 +150,7 @@ async function handleRun(options: RunOptions): Promise<void> {
       server = await serveStaticBuild(options.build);
       serverUrl = server.url;
     }
-    const urls = resolveUrls(options, serverUrl, config);
+    const urls = resolveUrls(options, serverUrl, discovered?.config);
 
     report = await buildAuditReport({
       urls,

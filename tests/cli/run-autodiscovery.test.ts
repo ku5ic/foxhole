@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { MockInstance } from "vitest";
 
 import { handleRun } from "../../src/cli/commands/run.js";
 import { loadConfig } from "../../src/config/load.js";
@@ -54,9 +55,11 @@ function makeReport(passed = true): AuditReport {
   };
 }
 
+let stderrSpy: MockInstance;
+
 beforeEach(() => {
   vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(process, "exit").mockImplementation(() => {
     throw new Error("process.exit called");
   });
@@ -140,5 +143,35 @@ describe("handleRun config-supplied URLs", () => {
     await expect(handleRun({ config: "/fake/foxhole.config.json" })).rejects.toThrow(
       "process.exit called",
     );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      "Error: /fake/foxhole.config.json does not specify url or urls, and no --url, --urls, or --build flag was given\n",
+    );
+  });
+
+  it("writes Using config to stderr when a config file is loaded", async () => {
+    vi.mocked(loadConfig).mockResolvedValue({
+      url: "https://example.com/",
+      checks: ["a11y", "perf", "semantic", "bundle"],
+      output: "markdown",
+    });
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ config: "/fake/foxhole.config.json" });
+
+    expect(stderrSpy).toHaveBeenCalledWith("Using config: /fake/foxhole.config.json\n");
+  });
+
+  it("suppresses Using config line under --quiet", async () => {
+    vi.mocked(loadConfig).mockResolvedValue({
+      url: "https://example.com/",
+      checks: ["a11y", "perf", "semantic", "bundle"],
+      output: "markdown",
+    });
+    vi.mocked(buildAuditReport).mockResolvedValue(makeReport());
+
+    await handleRun({ config: "/fake/foxhole.config.json", quiet: true });
+
+    const calls = stderrSpy.mock.calls.map((c) => c[0] as string);
+    expect(calls.every((line) => !line.startsWith("Using config:"))).toBe(true);
   });
 });

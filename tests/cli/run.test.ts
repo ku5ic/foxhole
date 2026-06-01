@@ -14,6 +14,14 @@ vi.mock("../../src/audit/index.js", () => ({
   buildAuditReport: vi.fn(),
 }));
 
+// Disable cwd config auto-discovery so these tests are not affected by a real foxhole.config.json.
+vi.mock("node:fs/promises", () => ({
+  default: {
+    access: vi.fn().mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" })),
+    writeFile: vi.fn().mockResolvedValue(null),
+  },
+}));
+
 function makeReport(passed = true): AuditReport {
   return {
     version: 1,
@@ -66,6 +74,7 @@ describe("handleRun input validation", () => {
   it("exits with code 2 when no input flag is provided", async () => {
     await expect(handleRun({})).rejects.toMatchObject({ code: 2 });
     expect(stderrSpy).toHaveBeenCalledWith("Error: one of --url, --urls, or --build is required\n");
+    expect(stderrSpy).toHaveBeenCalledWith("Run 'foxhole run --help' for usage.\n");
   });
 
   it("exits with code 2 when --url and --urls are both set", async () => {
