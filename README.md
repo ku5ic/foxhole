@@ -6,39 +6,44 @@
 
 Frontend audit CLI and MCP server. Dig into your frontend. Find what is hiding.
 
-Foxhole audits any URL, local build, or SPA route list for accessibility violations, performance regressions, semantic HTML issues, and bundle problems. It wraps Lighthouse and axe-core, adds a custom semantic checker and bundle analysis, and produces scored, prioritized output that reads like a senior engineer's review.
+Foxhole audits any URL, local build, or SPA route list for accessibility violations, performance regressions, semantic HTML issues, and bundle problems. It wraps Lighthouse and axe-core, adds a custom semantic checker and bundle analysis, and produces scored, prioritized findings designed to be read by a developer or consumed by an AI agent.
 
 ---
 
-## CI integration
+## Why foxhole
 
-The primary use case is a CI gate. Foxhole exits non-zero when the audit score drops below a threshold.
+**Lighthouse CI** runs Lighthouse and stores score history. It surfaces a score drop, gives you Lighthouse's own prioritized opportunities (render-blocking resources, unused JS, large payloads), and flags regressions. What it does not do is combine those performance findings with an axe-core accessibility pass, a semantic HTML check, or a cross-category ranked fix list in a single report. You still get separate signals, not one answer.
 
-```yaml
-- name: Install foxhole
-  run: |
-    npm install -g @ku5ic/foxhole
-    npx playwright install chromium
-    npx playwright install-deps chromium   # Linux only
+**axe-core in a test suite** gives you violation counts against the live DOM. It has no performance data, no bundle size analysis, and no narrative. Violations are raw rule IDs that require a lookup to understand, and there is no concept of severity ranking across finding types.
 
-- name: Audit
-  run: foxhole run --url ${{ env.STAGING_URL }} --threshold 80 --output json --out audit.json
+**Foxhole** runs both engines in one command, adds a custom semantic checker that catches issues axe-core does not (multiple h1, fake buttons without keyboard access, interactive elements without accessible text), adds network-capture bundle analysis, and produces a single scored report with findings ranked by severity and effort. A failing build tells you not just that something is wrong, but what to fix first and why. The same report is returned as structured JSON by the MCP server, so an AI agent can reason about it and act.
 
-- name: Upload audit report
-  uses: actions/upload-artifact@v4
-  if: always()
-  with:
-    name: foxhole-report
-    path: audit.json
-```
+---
 
-Exit codes:
+## What foxhole checks
 
-- `0` audit passed, score at or above threshold
-- `1` audit completed, score below threshold
-- `2` runtime error, config error, or page failed to load
+### Performance (`perf`)
 
-A non-zero exit makes the step fail. The JSON report is the artifact you upload and diff across runs. A reusable composite Action is planned post-launch.
+Runs Lighthouse against the target page. Reports Core Web Vitals (LCP, FID, CLS, FCP, TTFB, TBT) alongside prioritized opportunities such as render-blocking resources, oversized images, and unused CSS.
+
+### Accessibility (`a11y`)
+
+Runs axe-core against the fully rendered DOM. Violations are mapped to WCAG clauses, classified by severity, and paired with specific recommendations rather than raw rule identifiers.
+
+### Semantic HTML (`semantic`)
+
+Inspects the DOM for structural issues: missing landmarks, improper heading hierarchy, form fields without labels, and interactive elements that should be native controls.
+
+### Bundle (`bundle`)
+
+Captures network responses during page load and reports:
+
+- Total JavaScript transfer above 500 KB
+- Any single JavaScript chunk above 200 KB, with framework vs. application classification (recommendations differ for each)
+- Total CSS transfer above 100 KB
+- Resources loaded over HTTP on an HTTPS page
+
+Bundle analysis works against any live URL or a local build served by `--build`. No build stats file is required.
 
 ---
 
@@ -46,15 +51,10 @@ A non-zero exit makes the step fail. The JSON report is the artifact you upload 
 
 ```bash
 npm install -g @ku5ic/foxhole
-```
-
-Then install the Chromium browser foxhole uses to audit pages:
-
-```bash
 npx playwright install chromium
 ```
 
-On Linux, also install the system dependencies:
+On Linux, also install system dependencies:
 
 ```bash
 npx playwright install-deps chromium
@@ -99,18 +99,18 @@ Runs an audit against a URL, a list of URLs, or a local build directory.
 
 ```
 Options:
-  --url           Single target URL
-  --urls          Comma-separated list of URLs or paths (SPA routes)
-  --build         Path to a static build directory, spins up a local server (requires --urls)
-  --checks        Subset of checks to run: perf, a11y, semantic, bundle (default: all)
-  --output        Output format: json | markdown (default: markdown)
-  --out           File path for output (default: stdout)
-  --config        Path to foxhole.config.json
-  --threshold     Exit with code 1 if score drops below this value (useful in CI)
-  --throttling    Lighthouse throttling preset: desktop, mobile, or none (default: none)
-  --concurrency   Number of URLs to audit in parallel (default: 1)
+  --url                Single target URL
+  --urls               Comma-separated list of URLs or paths (SPA routes)
+  --build              Path to a static build directory, serves on an internal port (requires --urls)
+  --checks             Subset of checks to run: perf, a11y, semantic, bundle (default: all)
+  --output             Output format: json | markdown (default: markdown)
+  --out                File path for output (default: stdout)
+  --config             Path to foxhole.config.json
+  --threshold          Exit with code 1 if overall score drops below this value
+  --throttling         Lighthouse throttling preset: desktop, mobile, or none (default: none)
+  --concurrency        Number of URLs to audit in parallel (default: 1)
   --exclude-framework  Exclude framework JS findings from score computation
-  --quiet         Suppress progress output
+  --quiet              Suppress progress output to stderr
 ```
 
 ### `foxhole compare`
@@ -120,25 +120,25 @@ Diffs two saved audit results and outputs the diff as JSON. Shows regressions, i
 ```bash
 foxhole compare ./before.json ./after.json
 
-# Gate CI on score regressions: exit 1 if score dropped
+# Gate CI on any score regression: exit 1 if score dropped
 foxhole compare ./before.json ./after.json --threshold 0
 
-# Require a minimum improvement: exit 1 if score did not increase by at least 5
+# Require a minimum improvement: exit 1 if score did not rise by at least 5
 foxhole compare ./before.json ./after.json --threshold 5
 ```
 
 ### `foxhole report`
 
-Renders a report from a saved JSON result without re-running the audit.
+Renders a report from a saved JSON result without re-running the audit. Output goes to stdout; use shell redirection to write to a file.
 
 ```bash
 foxhole report ./audit.json
-foxhole report ./audit.json --output markdown
+foxhole report ./audit.json --output json > ./audit-rerendered.json
 ```
 
 ### `foxhole init`
 
-Creates a `foxhole.config.json` in the current directory.
+Creates a `foxhole.config.json` in the current directory. Prompts interactively before overwriting an existing file.
 
 ### `foxhole mcp`
 
@@ -148,6 +148,8 @@ Starts the MCP server over stdio. See [MCP server](#mcp-server) below.
 
 ## Config file
 
+Store project settings in `foxhole.config.json`. CLI flags always take precedence over config values.
+
 ```json
 {
   "url": "https://example.com",
@@ -155,15 +157,20 @@ Starts the MCP server over stdio. See [MCP server](#mcp-server) below.
   "checks": ["perf", "a11y", "semantic"],
   "output": "json",
   "out": "./audit.json",
-  "threshold": 80
+  "threshold": 80,
+  "throttling": "none",
+  "concurrency": 1,
+  "exclude_framework": false
 }
 ```
 
-Run with config:
+All fields are optional. Unknown fields cause a validation error.
 
 ```bash
 foxhole run --config foxhole.config.json
 ```
+
+Config is also auto-discovered from the current working directory when `--config` is not set.
 
 ---
 
@@ -205,7 +212,7 @@ Wrap the primary content in a single <main> element.
 Wrap all content in landmark elements such as <main>, <nav>, <header>, or <footer>.
 ```
 
-The fixes are ranked by severity. Running with `--output json` produces a structured `AuditReport` whose full schema is documented in [docs/spec/schemas.md](docs/spec/schemas.md).
+Running with `--output json` produces a structured `AuditReport` whose schema is documented in [docs/spec/schemas.md](docs/spec/schemas.md).
 
 ---
 
@@ -215,13 +222,33 @@ Foxhole exposes its audit capabilities as MCP tools callable by any MCP-compatib
 
 ### Claude Code
 
-Register foxhole as an MCP server:
+Register foxhole as a user-level MCP server, available across all your projects:
 
 ```bash
-claude mcp add foxhole foxhole mcp
+claude mcp add --scope user --transport stdio foxhole -- foxhole mcp
 ```
 
-That's it. Restart Claude Code and the six tools are available in your session.
+For a project-scoped install shared with teammates via `.mcp.json`:
+
+```bash
+claude mcp add --scope project --transport stdio foxhole -- foxhole mcp
+```
+
+The `--` separator before `foxhole mcp` is required; without it, the `mcp` argument is misparsed as a flag.
+
+Verify the server was added:
+
+```bash
+claude mcp list
+```
+
+Scope reference:
+
+| Scope     | Stored in        | Visible to                     |
+| --------- | ---------------- | ------------------------------ |
+| `user`    | `~/.claude.json` | All your projects              |
+| `project` | `.mcp.json`      | This project (commit to share) |
+| `local`   | `~/.claude.json` | This project only (not in git) |
 
 ### Other MCP clients
 
@@ -231,15 +258,15 @@ Add the following to your MCP client's server config:
 {
   "mcpServers": {
     "foxhole": {
+      "type": "stdio",
       "command": "foxhole",
-      "args": ["mcp"],
-      "type": "stdio"
+      "args": ["mcp"]
     }
   }
 }
 ```
 
-Available tools:
+### Available tools
 
 | Tool                      | Description                                                                 |
 | ------------------------- | --------------------------------------------------------------------------- |
@@ -248,37 +275,45 @@ Available tools:
 | `run_performance_audit`   | Lighthouse pass. Returns CWV metrics and prioritized opportunities.         |
 | `get_prioritized_fixes`   | Takes a serialized AuditReport and returns a ranked fix plan.               |
 | `compare_runs`            | Diffs two AuditReports. Returns regressions, improvements, and score delta. |
-| `generate_report`         | Renders an AuditReport as markdown.                                         |
+| `generate_report`         | Renders an AuditReport as JSON or markdown.                                 |
+
+The three audit tools (`run_full_audit`, `run_accessibility_audit`, `run_performance_audit`) load `foxhole.config.json` from the server's working directory on each invocation. Pass a `config` input to use a different file. Tool input takes precedence over config, which takes precedence over built-in defaults.
 
 ---
 
-## What foxhole checks
+## CI integration
 
-### Performance (`perf`)
+The primary use case is a CI gate. Foxhole exits non-zero when the audit score drops below a threshold.
 
-Runs Lighthouse against the target page and reports Core Web Vitals alongside prioritized opportunities. Metrics include LCP, FID, CLS, FCP, TTFB, and TBT.
+```yaml
+- name: Install foxhole
+  run: |
+    npm install -g @ku5ic/foxhole
+    npx playwright install chromium
+    npx playwright install-deps chromium   # Linux only
 
-### Accessibility (`a11y`)
+- name: Audit
+  run: foxhole run --url ${{ env.STAGING_URL }} --threshold 80 --output json --out audit.json
 
-Runs axe-core against the fully rendered DOM. Violations are mapped to WCAG clauses, classified by severity, and paired with specific recommendations rather than raw rule identifiers.
+- name: Upload audit report
+  uses: actions/upload-artifact@v4
+  if: always()
+  with:
+    name: foxhole-report
+    path: audit.json
+```
 
-### Semantic HTML (`semantic`)
+Exit codes:
 
-Inspects the DOM for structural issues: missing landmarks, improper heading hierarchy, form fields without labels, and interactive elements that should be native controls.
+- `0` audit passed (score at or above threshold, or no threshold set)
+- `1` audit completed, score below threshold
+- `2` runtime error, config error, or page failed to load
 
-### Bundle (`bundle`)
+Store the JSON artifact and use `foxhole compare` to gate on score regressions across runs:
 
-Analyzes build output for oversized chunks, missing code splitting, and unoptimized dependencies. Requires `--build` mode or a build stats file.
-
----
-
-## Why not Lighthouse CI or axe-core directly?
-
-**Lighthouse CI** runs Lighthouse and stores score history. It flags a build when a score drops but gives you a raw number, not a ranked list of what to fix. You end up chasing a score rather than a specific problem.
-
-**axe-core in a test suite** gives you violation counts but no performance data, no bundle analysis, and no narrative. Violations are raw rule IDs that require a lookup to understand.
-
-**Foxhole** combines both engines, adds a custom semantic checker and bundle analysis, and produces a single scored report with findings ranked by severity and effort. The output is designed to be read by a developer or consumed directly by an AI agent. A failing build tells you not just that something is wrong, but what to fix first and why.
+```bash
+foxhole compare ./previous-audit.json ./audit.json --threshold 0
+```
 
 ---
 
@@ -301,13 +336,13 @@ foxhole run --build ./dist --urls /login,/dashboard,/settings
 ## Requirements
 
 - Node.js 20 or later
-- Chromium: run `npx playwright install chromium` after installing foxhole (Linux also needs `npx playwright install-deps chromium`)
+- Chromium: `npx playwright install chromium` after installing foxhole (Linux also needs `npx playwright install-deps chromium`)
 
 ---
 
 ## Known limitations
 
-- Cross-origin source maps are not fetched. Findings on bundles whose source maps live on a different origin will surface with the bundled coordinates rather than the original source.
+- Cross-origin source maps are not fetched. Findings on bundles whose source maps live on a different origin will surface with bundled coordinates rather than original source.
 - `Finding.source` is always null in this release. Source map integration is planned for a later phase.
 - Lighthouse and Playwright open separate Chromium instances for each page audit. They do not share a browser. This costs one additional Chromium launch per page when both `perf` and other checks are requested.
 - `--build` mode serves static files only. There is no server-side renderer and no proxy for backend API requests; pages that depend on either need to be audited against a running environment.
