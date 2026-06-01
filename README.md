@@ -115,10 +115,16 @@ Options:
 
 ### `foxhole compare`
 
-Diffs two saved audit results and outputs the diff as JSON. Shows regressions, improvements, and net score delta.
+Diffs two saved audit results and outputs the diff as JSON. Shows regressions, improvements, and net score delta (`after.score - before.score`).
 
 ```bash
 foxhole compare ./before.json ./after.json
+
+# Gate CI on score regressions: exit 1 if score dropped
+foxhole compare ./before.json ./after.json --threshold 0
+
+# Require a minimum improvement: exit 1 if score did not increase by at least 5
+foxhole compare ./before.json ./after.json --threshold 5
 ```
 
 ### `foxhole report`
