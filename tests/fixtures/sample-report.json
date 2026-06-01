@@ -139,6 +139,11 @@
     "perf_runs": 1,
     "perf_profile": "none",
     "source_maps": "auto",
+    "exclude_framework": false,
+    "run_id": null,
+    "project_id": null,
+    "commit_sha": null,
+    "branch": null,
     "dependencies": {
       "axe_core": "4.10.0",
       "lighthouse": "12.2.1",

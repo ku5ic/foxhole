@@ -176,6 +176,10 @@ async function handleRun(options: RunOptions): Promise<void> {
     process.stdout.write(content);
   }
 
+  if (report.pages.length > 0 && report.pages.every((p) => p.status === "errored")) {
+    process.stderr.write("Error: no pages could be audited\n");
+    process.exit(2);
+  }
   if (!report.meta.passed) {
     process.exit(1);
   }

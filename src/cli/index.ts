@@ -8,6 +8,7 @@ import { registerRunCommand } from "./commands/run.js";
 import { registerCompareCommand } from "./commands/compare.js";
 import { registerReportCommand } from "./commands/report.js";
 import { registerInitCommand } from "./commands/init.js";
+import { registerMcpCommand } from "./commands/mcp.js";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const packageJsonPath = path.resolve(__dirname, "..", "..", "package.json");
@@ -26,5 +27,6 @@ registerRunCommand(program);
 registerCompareCommand(program);
 registerReportCommand(program);
 registerInitCommand(program);
+registerMcpCommand(program);
 
 program.parse(process.argv);

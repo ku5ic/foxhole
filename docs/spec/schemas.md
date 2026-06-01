@@ -181,7 +181,7 @@ export interface RunMeta {
   perf_runs: number; // value used for this run
   perf_profile: "desktop" | "mobile" | "none";
   source_maps: "auto" | "on" | "off";
-  exclude_framework: boolean; // true when --exclude-framework was active; false by default
+  exclude_framework?: boolean; // optional, defaults to false; true when --exclude-framework was active
   dependencies: {
     axe_core: string; // version of axe-core used
     lighthouse: string; // version of lighthouse used

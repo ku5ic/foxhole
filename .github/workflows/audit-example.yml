@@ -1,0 +1,50 @@
+name: Audit example
+
+# A red build is the feature. This workflow proves the published tarball
+# produces a non-zero exit when the site score drops below --threshold.
+# To demo the gate: raise --threshold in the "Run audit" step above the
+# actual score (~82 for example.com). The build goes red. That is the point.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install chromium
+
+      - name: Install Chromium system dependencies
+        run: npx playwright install-deps chromium
+
+      - run: npm run clean
+      - run: npm run build
+
+      - name: Pack and install globally
+        run: |
+          npm pack
+          VERSION=$(node -e "process.stdout.write(require('./package.json').version)")
+          npm install -g "foxhole-${VERSION}.tgz"
+
+      - name: Run audit
+        # Default threshold is 80. Raise it above ~82 to force exit 1 and demo the gate.
+        run: foxhole run --url https://example.com --output json --out audit.json --threshold 80
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-report
+          path: audit.json

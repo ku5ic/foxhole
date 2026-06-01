@@ -9,13 +9,23 @@ import {
 } from "../../src/runner/browser.js";
 import { RunnerError } from "../../src/errors.js";
 
-const { mockLaunchServer, mockConnect } = vi.hoisted(() => ({
+const { mockLaunchServer, mockConnect, mockExecPath, mockAccess } = vi.hoisted(() => ({
   mockLaunchServer: vi.fn(),
   mockConnect: vi.fn(),
+  mockExecPath: vi.fn(() => "/fake/chromium"),
+  mockAccess: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("playwright", () => ({
-  chromium: { launchServer: mockLaunchServer, connect: mockConnect },
+  chromium: {
+    launchServer: mockLaunchServer,
+    connect: mockConnect,
+    executablePath: mockExecPath,
+  },
+}));
+
+vi.mock("node:fs/promises", () => ({
+  default: { access: mockAccess },
 }));
 
 beforeEach(() => {
@@ -23,6 +33,15 @@ beforeEach(() => {
 });
 
 describe("createBrowser", () => {
+  it("throws RunnerError with install instructions when Chromium executable is missing", async () => {
+    mockAccess.mockRejectedValueOnce(new Error("ENOENT"));
+
+    await expect(createBrowser()).rejects.toMatchObject({
+      message: "Chromium is not installed. Run: npx playwright install chromium",
+    });
+    await expect(createBrowser()).rejects.toBeInstanceOf(RunnerError);
+  });
+
   it("throws RunnerError with the original cause when chromium.launchServer rejects", async () => {
     const cause = new Error("server launch failed");
     mockLaunchServer.mockRejectedValue(cause);

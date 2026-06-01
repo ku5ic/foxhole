@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import net from "node:net";
 
 import { chromium } from "playwright";
@@ -46,6 +47,13 @@ async function createBrowser(): Promise<{
   server: BrowserServer;
   cdpPort: number;
 }> {
+  const execPath = chromium.executablePath();
+  try {
+    await fs.access(execPath);
+  } catch {
+    throw new RunnerError("Chromium is not installed. Run: npx playwright install chromium");
+  }
+
   let server: BrowserServer | undefined;
   try {
     const cdpPort = await findFreePort();
