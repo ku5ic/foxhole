@@ -91,6 +91,16 @@ describe("run_full_audit handler", () => {
     expect(buildAuditReport).toHaveBeenCalledWith(expect.objectContaining({ threshold: 85 }));
   });
 
+  it("resolves comma-separated urls input into a list with inputMode urls", async () => {
+    await runFullAuditTool.handler({ urls: "https://a.com, https://b.com" });
+    expect(buildAuditReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        urls: ["https://a.com", "https://b.com"],
+        inputMode: "urls",
+      }),
+    );
+  });
+
   it("throws when no url is provided and no config is present", async () => {
     await expect(runFullAuditTool.handler({})).rejects.toThrow();
   });

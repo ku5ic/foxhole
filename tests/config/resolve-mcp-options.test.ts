@@ -105,6 +105,26 @@ describe("resolveMcpAuditOptions -- checks resolution", () => {
     const result = await resolveMcpAuditOptions({ url: "https://example.com" });
     expect(result.checks).toEqual(["semantic"]);
   });
+
+  it("throws ConfigError for an invalid check category in input.checks", async () => {
+    await expect(
+      resolveMcpAuditOptions({ url: "https://example.com", checks: "a11y,notacheck" }),
+    ).rejects.toBeInstanceOf(ConfigError);
+  });
+});
+
+describe("resolveMcpAuditOptions -- threshold validation", () => {
+  it("throws ConfigError when input threshold is out of range", async () => {
+    await expect(
+      resolveMcpAuditOptions({ url: "https://example.com", threshold: 150 }),
+    ).rejects.toBeInstanceOf(ConfigError);
+  });
+
+  it("throws ConfigError when input threshold is NaN", async () => {
+    await expect(
+      resolveMcpAuditOptions({ url: "https://example.com", threshold: Number.NaN }),
+    ).rejects.toBeInstanceOf(ConfigError);
+  });
 });
 
 describe("resolveMcpAuditOptions -- other options", () => {

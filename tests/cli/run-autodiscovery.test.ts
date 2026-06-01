@@ -161,6 +161,14 @@ describe("handleRun config-supplied URLs", () => {
     expect(stderrSpy).toHaveBeenCalledWith("Using config: /fake/foxhole.config.json\n");
   });
 
+  it("propagates ConfigError when the explicit --config file cannot be loaded", async () => {
+    vi.mocked(loadConfig).mockRejectedValue(new Error("Configuration file not found"));
+
+    await expect(handleRun({ config: "/nonexistent/foxhole.config.json" })).rejects.toThrow(
+      "Configuration file not found",
+    );
+  });
+
   it("suppresses Using config line under --quiet", async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       url: "https://example.com/",
