@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1
+
+### Patch Changes
+
+- ebb44d4: Config-aware run and MCP audit tools now auto-discover `foxhole.config.json` from the current directory without a `--config` flag; CLI flags override config values. `foxhole compare --threshold <n>` exits with code 1 when `score_delta` falls below the threshold, enabling CI regression gating. Documentation corrected to match the actual CLI surface.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
