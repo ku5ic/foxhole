@@ -22,6 +22,11 @@ interface RunnerOptions {
   concurrency: number;
 }
 
+interface CheckDescriptor {
+  category: CheckCategory;
+  run: () => Promise<{ findings: Finding[]; metricsPatch?: Partial<PerformanceMetrics> }>;
+}
+
 function log(message: string, quiet: boolean): void {
   if (!quiet) {
     process.stderr.write(`[foxhole] ${message}\n`);
@@ -112,61 +117,71 @@ async function auditSinglePage(url: string, options: RunnerOptions): Promise<Pag
         }
       }
 
+      const descriptors: CheckDescriptor[] = [];
+
       if (options.checks.includes("a11y")) {
-        log("Running accessibility checks", options.quiet);
-        try {
-          const axeResult = await runAxe(page, url);
-          findings.push(...axeResult.findings);
-        } catch (error) {
-          const msg = formatErrorChain(error);
-          log(`a11y runner failed: ${msg}`, options.quiet);
-          erroredCategories.push(buildErroredCategorySummary("a11y", msg));
-        }
+        descriptors.push({
+          category: "a11y",
+          run: async () => {
+            const result = await runAxe(page, url);
+            return { findings: result.findings };
+          },
+        });
       }
 
       if (options.checks.includes("perf")) {
-        log("Running performance checks", options.quiet);
-        try {
-          const lighthouseResult = await runLighthouseQueued(url, cdpPort, options.throttling);
-          metrics = { ...metrics, ...lighthouseResult.metrics };
-          findings.push(...lighthouseResult.findings);
-        } catch (error) {
-          const msg = formatErrorChain(error);
-          log(`perf runner failed: ${msg}`, options.quiet);
-          erroredCategories.push(buildErroredCategorySummary("perf", msg));
-        }
+        descriptors.push({
+          category: "perf",
+          run: async () => {
+            const result = await runLighthouseQueued(url, cdpPort, options.throttling);
+            return { findings: result.findings, metricsPatch: result.metrics };
+          },
+        });
       }
 
       if (options.checks.includes("semantic")) {
-        log("Running semantic checks", options.quiet);
-        try {
-          const semanticResult = await runSemanticChecks(page, url);
-          findings.push(...semanticResult.findings);
-        } catch (error) {
-          const msg = formatErrorChain(error);
-          log(`semantic runner failed: ${msg}`, options.quiet);
-          erroredCategories.push(buildErroredCategorySummary("semantic", msg));
-        }
+        descriptors.push({
+          category: "semantic",
+          run: async () => {
+            const result = await runSemanticChecks(page, url);
+            return { findings: result.findings };
+          },
+        });
       }
 
       if (options.checks.includes("bundle")) {
-        log("Running bundle checks", options.quiet);
-        let bundlePage;
+        descriptors.push({
+          category: "bundle",
+          run: async () => {
+            const bundlePage = await createPage(browser);
+            try {
+              const result = await runBundleChecks(bundlePage, url, options.quiet);
+              return {
+                findings: result.findings,
+                metricsPatch: {
+                  bundle_size: result.bundle_size,
+                  framework_bundle_size: result.framework_bundle_size,
+                },
+              };
+            } finally {
+              await bundlePage.close();
+            }
+          },
+        });
+      }
+
+      for (const descriptor of descriptors) {
+        log(`Running ${descriptor.category} checks`, options.quiet);
         try {
-          bundlePage = await createPage(browser);
-          const bundleResult = await runBundleChecks(bundlePage, url, options.quiet);
-          findings.push(...bundleResult.findings);
-          metrics = {
-            ...metrics,
-            bundle_size: bundleResult.bundle_size,
-            framework_bundle_size: bundleResult.framework_bundle_size,
-          };
+          const result = await descriptor.run();
+          findings.push(...result.findings);
+          if (result.metricsPatch !== undefined) {
+            metrics = { ...metrics, ...result.metricsPatch };
+          }
         } catch (error) {
           const msg = formatErrorChain(error);
-          log(`bundle runner failed: ${msg}`, options.quiet);
-          erroredCategories.push(buildErroredCategorySummary("bundle", msg));
-        } finally {
-          await bundlePage?.close();
+          log(`${descriptor.category} runner failed: ${msg}`, options.quiet);
+          erroredCategories.push(buildErroredCategorySummary(descriptor.category, msg));
         }
       }
 
