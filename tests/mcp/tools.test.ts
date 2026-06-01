@@ -1,9 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { getPrioritizedFixesTool } from "../../src/mcp/tools/get_prioritized_fixes.js";
+import { ConfigError, RunnerError } from "../../src/errors.js";
 import { compareRunsTool } from "../../src/mcp/tools/compare_runs.js";
 import { generateReportTool } from "../../src/mcp/tools/generate_report.js";
-import { ConfigError } from "../../src/errors.js";
+import { getPrioritizedFixesTool } from "../../src/mcp/tools/get_prioritized_fixes.js";
+import { runAccessibilityAuditTool } from "../../src/mcp/tools/run_accessibility_audit.js";
+import { runFullAuditTool } from "../../src/mcp/tools/run_full_audit.js";
+
+vi.mock("../../src/audit/index.js", () => ({
+  buildAuditReport: vi.fn(),
+}));
 
 // These handlers now throw ConfigError on bad input rather than crashing with a
 // runtime type error. The MCP index catches and formats the error; here we verify
@@ -50,5 +56,29 @@ describe("generate_report handler validation", () => {
         format: "markdown",
       }),
     ).toThrow(ConfigError);
+  });
+});
+
+// Async audit tools: errors from the audit layer must propagate as rejections so
+// the MCP server's errorResult wrapper can catch and format them. An unhandled
+// throw that escapes the server boundary would silently break the MCP client.
+
+describe("run_full_audit handler: audit-layer errors propagate", () => {
+  it("rejects when buildAuditReport throws a RunnerError", async () => {
+    const { buildAuditReport } = await import("../../src/audit/index.js");
+    vi.mocked(buildAuditReport).mockRejectedValue(new RunnerError("browser failed"));
+    await expect(runFullAuditTool.handler({ url: "https://example.com" })).rejects.toThrow(
+      RunnerError,
+    );
+  });
+});
+
+describe("run_accessibility_audit handler: audit-layer errors propagate", () => {
+  it("rejects when buildAuditReport throws a RunnerError", async () => {
+    const { buildAuditReport } = await import("../../src/audit/index.js");
+    vi.mocked(buildAuditReport).mockRejectedValue(new RunnerError("browser failed"));
+    await expect(runAccessibilityAuditTool.handler({ url: "https://example.com" })).rejects.toThrow(
+      RunnerError,
+    );
   });
 });
