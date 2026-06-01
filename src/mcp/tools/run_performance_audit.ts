@@ -27,6 +27,7 @@ const runPerformanceAuditTool = {
       concurrency: resolved.concurrency,
       perfRuns: 1,
       sourceMaps: "auto",
+      excludeFramework: resolved.excludeFramework,
     });
     const page = report.pages[0];
     const result = {

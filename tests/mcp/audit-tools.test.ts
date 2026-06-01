@@ -156,6 +156,14 @@ describe("run_performance_audit handler", () => {
     );
   });
 
+  it("passes excludeFramework from config to buildAuditReport", async () => {
+    vi.mocked(discoverConfig).mockResolvedValue(makeDiscovered({ exclude_framework: true }));
+    await runPerformanceAuditTool.handler({ url: "https://example.com" });
+    expect(buildAuditReport).toHaveBeenCalledWith(
+      expect.objectContaining({ excludeFramework: true }),
+    );
+  });
+
   it("throws when no url is provided and no config is present", async () => {
     await expect(runPerformanceAuditTool.handler({})).rejects.toThrow();
   });
