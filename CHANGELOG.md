@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+### Patch Changes
+
+- e0aa91b: Security: resolve GHSA-58qx-3vcg-4xpx (ws uninitialized memory disclosure) and GHSA-g7r4-m6w7-qqqr (esbuild network exposure) via dependency updates.
+
 ## 1.0.1
 
 ### Patch Changes
