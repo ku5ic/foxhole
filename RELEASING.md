@@ -4,8 +4,10 @@
 
 Releases use [Changesets](https://github.com/changesets/changesets). The release workflow in `.github/workflows/release.yml` runs on every push to `main`:
 
-- If changesets are present: creates or updates a "Version Packages" pull request that bumps the version and updates `CHANGELOG.md`.
+- If changesets are present: creates or updates a "Version Packages" pull request that bumps the version, updates `CHANGELOG.md`, and regenerates `package-lock.json`.
 - If no changesets are present (i.e., the version PR was merged): publishes the package to npm using OIDC trusted publishing.
+
+The version step runs the `version` script (`changeset version && npm install --package-lock-only`) rather than `changeset version` alone. The lockfile regeneration is the reason: `changeset version` rewrites `package.json` but not `package-lock.json`, which otherwise leaves the lockfile a version behind every release.
 
 ---
 
@@ -82,6 +84,8 @@ The tarball must contain only `dist/`, `bin/`, `README.md`, `LICENSE`, `CHANGELO
 ## Version bump
 
 The version bump in `package.json` is handled by the "Version Packages" PR. Do not bump the version manually. The `1.0.0` initial bump (from `0.1.0`) is an exception: it is gated on all Phase 6 checks passing and is performed as the final pre-publish step, documented in the plan.
+
+Specifically, do not run `npm version`. The `version` script shares its name with npm's `version` lifecycle hook, so `npm version <x>` would fire `changeset version` mid-bump and version the package twice.
 
 ---
 
