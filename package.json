@@ -50,6 +50,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",
+    "version": "changeset version && npm install --package-lock-only",
     "release": "changeset publish"
   },
   "dependencies": {
