@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+### Patch Changes
+
+- 201dae1: Internal: regenerate package-lock.json as part of the release version step, so the lockfile no longer trails package.json by one release. No runtime or API change.
+
 ## 1.0.3
 
 ### Patch Changes

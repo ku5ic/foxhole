@@ -1,6 +1,6 @@
 {
   "name": "@ku5ic/foxhole",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Frontend audit CLI and MCP server. Audits URLs and local builds for a11y, performance, semantics, and bundle issues.",
   "type": "module",
   "main": "./dist/cli/index.js",
