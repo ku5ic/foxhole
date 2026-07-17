@@ -53,6 +53,9 @@
     "version": "changeset version && npm install --package-lock-only",
     "release": "changeset publish"
   },
+  "overrides": {
+    "@opentelemetry/core": "^2.9.0"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axe-core": "^4.11.2",
